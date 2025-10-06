@@ -7,6 +7,7 @@
  * Ejemplos: HomePage, DashboardPage, ReportsPage, etc.
  */
 
+export { LoginPage } from './LoginPage';
 // export { HomePage } from './home';
 // export { DashboardPage } from './dashboard';
 // export { ReportsPage } from './reports';

@@ -7,7 +7,9 @@
  * Ejemplos: formatters, validators, parsers, etc.
  */
 
+// Validaciones
+export * from './validation';
+
 // export { formatDate, formatCurrency } from './formatters';
-// export { validateEmail, validatePassword } from './validators';
 // export { debounce, throttle } from './performance';
 

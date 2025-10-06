@@ -15,7 +15,10 @@ export const APP_VERSION = '0.0.0';
 export const PAGINATION_LIMIT = 10;
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-// Mensajes
+// Mensajes de autenticación
+export * from './messages';
+
+// Mensajes generales
 export const MESSAGES = {
   ERROR: {
     GENERIC: 'Ha ocurrido un error. Por favor, intenta de nuevo.',
