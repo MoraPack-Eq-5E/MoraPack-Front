@@ -14,6 +14,14 @@ export {
   type AuthState 
 } from './auth.types';
 
+// Tipos de mapa
+export {
+  type Aeropuerto,
+  type Vuelo,
+  type EstadoVuelo,
+  type MapMode
+} from './map.types';
+
 // Tipos de API
 // export type { Report, Service, Community, Membership } from './api';
 

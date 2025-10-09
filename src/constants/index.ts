@@ -18,6 +18,9 @@ export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 // Mensajes de autenticación
 export * from './messages';
 
+// Layout constants
+export * from './layout';
+
 // Mensajes generales
 export const MESSAGES = {
   ERROR: {
