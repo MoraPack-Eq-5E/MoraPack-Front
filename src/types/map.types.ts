@@ -1,15 +1,10 @@
 /**
- *  Enums del dominio
- *
- */
-export type EstadoVuelo = 'CONFIRMADO' | 'CON_RETRASO' | 'EN_CAMINO' | 'FINALIZADO';
-
-
-/**
  *  Entidades del dominio
  *  (shape canon para el front)
  *
  */
+export type EstadoVuelo = 'CONFIRMADO' | 'CON_RETRASO' | 'EN_CAMINO' | 'FINALIZADO';
+
 export interface Aeropuerto {
     id: number,
     codigo: string;
