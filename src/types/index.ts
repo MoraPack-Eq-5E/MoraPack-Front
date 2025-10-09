@@ -22,6 +22,18 @@ export {
   type MapMode
 } from './map.types';
 
+// Tipos de dashboard
+export {
+  type DashboardMetrics,
+  type FlightStatus,
+  type FlightSchedule,
+  type AlertType,
+  type Alert,
+  type DeliveryChartData,
+  type CapacityData,
+  type Sede
+} from './dashboard.types';
+
 // Tipos de API
 // export type { Report, Service, Community, Membership } from './api';
 

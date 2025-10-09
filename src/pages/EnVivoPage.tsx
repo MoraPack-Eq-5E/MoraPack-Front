@@ -10,6 +10,10 @@
 import { MapView } from '@/features/map/components';
 
 export function EnVivoPage() {
-  return <MapView mode="live" />;
+  return (
+    <div className="h-full">
+      <MapView mode="live" />
+    </div>
+  );
 }
 
