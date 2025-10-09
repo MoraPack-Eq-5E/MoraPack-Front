@@ -9,7 +9,8 @@
 
 export { LoginPage } from './LoginPage';
 export { DashboardPage } from './DashboardPage';
-export { MapPage } from './MapPage';
+export { EnVivoPage } from './EnVivoPage';
+export { SimulacionPage } from './SimulacionPage';
 // export { HomePage } from './home';
 // export { DashboardPage } from './dashboard';
 // export { ReportsPage } from './reports';

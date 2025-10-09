@@ -5,6 +5,11 @@
  */
 export type EstadoVuelo = 'CONFIRMADO' | 'CON_RETRASO' | 'EN_CAMINO' | 'FINALIZADO';
 
+/**
+ * Modo de visualización del mapa
+ */
+export type MapMode = 'live' | 'simulation';
+
 export interface Aeropuerto {
     id: number,
     codigo: string;
