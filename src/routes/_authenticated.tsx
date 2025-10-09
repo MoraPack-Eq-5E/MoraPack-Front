@@ -23,8 +23,11 @@ function AuthenticatedLayout() {
       
       {/* Main content area - todas las páginas hijas se renderizan aquí */}
       <main 
-        className="fixed top-16 bottom-0 right-0" 
-        style={{ left: `${LAYOUT.SIDEBAR_WIDTH}px` }}
+        className="fixed top-16 bottom-0 overflow-auto" 
+        style={{ 
+          left: `${LAYOUT.SIDEBAR_WIDTH}px`,
+          right: 0
+        }}
       >
         <Outlet />
       </main>

@@ -3,7 +3,7 @@
  * Layout para páginas de autenticación con división imagen/formulario
  */
 
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 interface AuthLayoutProps {
   children: ReactNode;

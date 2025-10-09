@@ -10,6 +10,10 @@
 import { MapView } from '@/features/map/components';
 
 export function SimulacionPage() {
-  return <MapView mode="simulation" />;
+  return (
+    <div className="h-full">
+      <MapView mode="simulation" />
+    </div>
+  );
 }
 

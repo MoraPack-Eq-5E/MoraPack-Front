@@ -19,3 +19,6 @@ export type { LabelProps } from './label';
 export { Checkbox } from './checkbox';
 export type { CheckboxProps } from './checkbox';
 
+export { Select } from './select';
+export type { SelectProps, SelectOption } from './select';
+
