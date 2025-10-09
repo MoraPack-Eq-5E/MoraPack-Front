@@ -1,27 +1,23 @@
-/** =========================
+/**
  *  Enums del dominio
- *  =========================
+ *
  */
-export enum EstadoVuelo {
-    CONFIRMADO = 'CONFIRMADO',
-    CON_RETRASO = 'CON_RETRASO',
-    EN_CAMINO = 'EN_CAMINO',
-    FINALIZADO = 'FINALIZADO',
-}
+export type EstadoVuelo = 'CONFIRMADO' | 'CON_RETRASO' | 'EN_CAMINO' | 'FINALIZADO';
 
-/** =========================
+
+/**
  *  Entidades del dominio
  *  (shape canon para el front)
- *  =========================
+ *
  */
 export interface Aeropuerto {
     id: number,
-    codigo: string,
-    capMaxAlmacen: number,
-    cantActual: number,
-    pais: string,
-    latitud: string,
-    longitud: string
+    codigo: string;
+    capMaxAlmacen: number;
+    cantActual: number;
+    pais: string;
+    latitud: number;
+    longitud: number;
 }
 
 export interface Vuelo {
@@ -33,6 +29,9 @@ export interface Vuelo {
 
     horaOrigen: string; // ISO string (DateTime). Ej: "2025-08-28T13:15:14Z"
     horaDestino: string;
+
+    husoOrigen: number;
+    husoDestino: number;
 
     capacidadMax: number;
     esIntercontinental: boolean;
