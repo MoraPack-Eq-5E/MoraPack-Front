@@ -17,11 +17,17 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as DashboardImport } from './routes/dashboard'
 import { Route as IndexImport } from './routes/index'
+import { Route as MapImport } from './routes/map'
 
 // Create/Update Routes
 
 const DashboardRoute = DashboardImport.update({
   path: '/dashboard',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MapRoute = MapImport.update({
+  path: '/map',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -48,6 +54,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardImport
       parentRoute: typeof rootRoute
     }
+    '/map': {
+      id: '/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof MapImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -56,36 +69,41 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/map': typeof MapRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/map': typeof MapRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/map': typeof MapRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard'
+  fullPaths: '/' | '/dashboard' | '/map'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard'
-  id: '__root__' | '/' | '/dashboard'
+  to: '/' | '/dashboard' | '/map'
+  id: '__root__' | '/' | '/dashboard' | '/map'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  MapRoute: typeof  MapRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  MapRoute: MapRoute,
 }
 
 export const routeTree = rootRoute
@@ -109,6 +127,9 @@ export const routeTree = rootRoute
     },
     "/dashboard": {
       "filePath": "dashboard.tsx"
+    },
+    "/map": {
+      "filePath": "map.tsx"
     }
   }
 }
