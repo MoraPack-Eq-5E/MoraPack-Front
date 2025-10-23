@@ -7,7 +7,8 @@
 
 // Tipos de autenticación
 export { 
-  type LoginCredentials, 
+  type LoginCredentials,
+  type RegisterCredentials,
   type User, 
   type AuthResponse, 
   type AuthError, 
