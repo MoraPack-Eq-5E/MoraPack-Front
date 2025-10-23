@@ -1,6 +1,6 @@
 /**
  * RegisterFormHeader Component
- * Logo y título del formulario de registro
+ * Header del formulario de registro con logo y título
  */
 
 import { AUTH_MESSAGES } from '@/constants';
@@ -8,7 +8,7 @@ import logoImage from '@/assets/icons/logo.png';
 
 export function RegisterFormHeader() {
   return (
-    <div className="mb-8 text-center">
+    <header className="mb-8 text-center">
       <div className="flex items-center justify-center mb-6">
         <img 
           src={logoImage} 
@@ -21,6 +21,6 @@ export function RegisterFormHeader() {
         {AUTH_MESSAGES.REGISTER.TITLE}
       </h1>
       <p className="text-gray-600">{AUTH_MESSAGES.REGISTER.SUBTITLE}</p>
-    </div>
+    </header>
   );
 }

@@ -1,6 +1,8 @@
 /**
  * Register Route
- * Ruta de registro de usuario
+ * Ruta pública de registro (/register)
+ * 
+ * Permite a nuevos usuarios crear una cuenta en la plataforma.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

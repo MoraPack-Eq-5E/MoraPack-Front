@@ -33,22 +33,30 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
 
   // Validar campo individual
   const validateField = (field: keyof RegisterCredentials, value: unknown): string | undefined => {
-    if (field === 'name') return validators.name(value as string);
-    if (field === 'email') return validators.email(value as string);
-    if (field === 'phone') return validators.phone(value as string);
-    if (field === 'password') return validators.password(value as string);
-    if (field === 'confirmPassword') {
-      const password = formData.password;
-      const confirmPassword = value as string;
-      if (confirmPassword && password !== confirmPassword) {
-        return 'Las contraseñas no coinciden';
+    switch (field) {
+      case 'name':
+        return validators.name(value as string);
+      case 'email':
+        return validators.email(value as string);
+      case 'phone':
+        return validators.phone(value as string);
+      case 'password':
+        return validators.password(value as string);
+      case 'confirmPassword': {
+        const confirmPassword = value as string;
+        if (!confirmPassword) {
+          return 'Confirma tu contraseña';
+        }
+        if (formData.password !== confirmPassword) {
+          return 'Las contraseñas no coinciden';
+        }
+        return undefined;
       }
-      return validators.password(confirmPassword);
+      case 'acceptTerms':
+        return (value as boolean) ? undefined : 'Debes aceptar los términos y condiciones';
+      default:
+        return undefined;
     }
-    if (field === 'acceptTerms') {
-      return (value as boolean) ? undefined : 'Debes aceptar los términos y condiciones';
-    }
-    return undefined;
   };
 
   // Validar todo el formulario

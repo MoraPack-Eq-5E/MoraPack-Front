@@ -29,7 +29,7 @@ export const AUTH_MESSAGES = {
     EMAIL_LABEL: 'Correo Electrónico',
     EMAIL_PLACEHOLDER: 'usuario@ejemplo.com',
     PHONE_LABEL: 'Número de Teléfono',
-    PHONE_PLACEHOLDER: '+1 234 567 8900',
+    PHONE_PLACEHOLDER: '+51 990509059',
     PASSWORD_LABEL: 'Contraseña',
     PASSWORD_PLACEHOLDER: '••••••••',
     CONFIRM_PASSWORD_LABEL: 'Confirmar Contraseña',
@@ -46,6 +46,6 @@ export const AUTH_MESSAGES = {
 export const VALIDATION_MESSAGES = {
   REQUIRED: 'Este campo es requerido',
   INVALID_EMAIL: 'Ingresa un correo electrónico válido',
-  MIN_PASSWORD_LENGTH: 'La contraseña debe tener al menos 6 caracteres',
+  MIN_PASSWORD_LENGTH: 'La contraseña debe tener al menos 8 caracteres',
+  PASSWORD_MISMATCH: 'Las contraseñas no coinciden',
 } as const;
-

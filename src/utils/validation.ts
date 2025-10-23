@@ -64,8 +64,8 @@ export const validators = {
       return 'El teléfono es requerido';
     }
     // Remover espacios, guiones y paréntesis para validar
-    const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
-    const phoneRegex = /^[\+]?[1-9][\d]{7,14}$/;
+    const cleanPhone = value.replace(/[\s\-()]/g, '');
+    const phoneRegex = /^[+]?[1-9]\d{7,14}$/;
     if (!phoneRegex.test(cleanPhone)) {
       return 'Ingresa un número de teléfono válido';
     }
@@ -88,9 +88,9 @@ export type ValidationErrors<T> = Partial<Record<keyof T, string>>;
 /**
  * Valida un objeto completo con un schema de validadores
  */
-export function validateForm<T extends Record<string, any>>(
+export function validateForm<T extends Record<string, unknown>>(
   values: T,
-  schema: Partial<Record<keyof T, (value: any) => string | undefined>>
+  schema: Partial<Record<keyof T, (value: unknown) => string | undefined>>
 ): ValidationErrors<T> {
   const errors: ValidationErrors<T> = {};
 
@@ -106,4 +106,3 @@ export function validateForm<T extends Record<string, any>>(
 
   return errors;
 }
-

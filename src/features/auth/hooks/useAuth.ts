@@ -164,4 +164,3 @@ export function useAuth() {
     registerError: registerMutation.error,
   };
 }
-

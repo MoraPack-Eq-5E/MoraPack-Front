@@ -1,6 +1,15 @@
 /**
  * RegisterPage
- * Página de registro de usuario
+ * Página de registro de nuevos usuarios
+ * 
+ * Permite a los usuarios crear una nueva cuenta proporcionando:
+ * - Nombre completo
+ * - Correo electrónico
+ * - Número de teléfono
+ * - Contraseña (con validaciones de seguridad)
+ * 
+ * Después del registro exitoso, el usuario es automáticamente
+ * autenticado y redirigido al dashboard.
  */
 
 import { useNavigate } from '@tanstack/react-router';
@@ -12,12 +21,10 @@ export function RegisterPage() {
   const navigate = useNavigate();
 
   const handleRegisterSuccess = () => {
-    // Navegar al dashboard después del registro exitoso
     navigate({ to: '/dashboard' });
   };
 
   const handleLoginClick = () => {
-    // Navegar a login
     navigate({ to: '/' });
   };
 
