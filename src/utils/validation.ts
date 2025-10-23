@@ -25,8 +25,49 @@ export const validators = {
     if (!value) {
       return 'La contraseña es requerida';
     }
-    if (value.length < 6) {
-      return 'La contraseña debe tener al menos 6 caracteres';
+    if (value.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres';
+    }
+    if (!/(?=.*[a-z])/.test(value)) {
+      return 'La contraseña debe contener al menos una letra minúscula';
+    }
+    if (!/(?=.*[A-Z])/.test(value)) {
+      return 'La contraseña debe contener al menos una letra mayúscula';
+    }
+    if (!/(?=.*\d)/.test(value)) {
+      return 'La contraseña debe contener al menos un número';
+    }
+    return undefined;
+  },
+
+  /**
+   * Valida nombre completo
+   */
+  name: (value: string): string | undefined => {
+    if (!value) {
+      return 'El nombre es requerido';
+    }
+    if (value.trim().length < 2) {
+      return 'El nombre debe tener al menos 2 caracteres';
+    }
+    if (value.trim().length > 50) {
+      return 'El nombre no puede tener más de 50 caracteres';
+    }
+    return undefined;
+  },
+
+  /**
+   * Valida número de teléfono
+   */
+  phone: (value: string): string | undefined => {
+    if (!value) {
+      return 'El teléfono es requerido';
+    }
+    // Remover espacios, guiones y paréntesis para validar
+    const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
+    const phoneRegex = /^[\+]?[1-9][\d]{7,14}$/;
+    if (!phoneRegex.test(cleanPhone)) {
+      return 'Ingresa un número de teléfono válido';
     }
     return undefined;
   },

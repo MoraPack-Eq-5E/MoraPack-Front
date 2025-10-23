@@ -21,6 +21,26 @@ export const AUTH_MESSAGES = {
   LOGOUT: {
     SUCCESS: 'Sesión cerrada exitosamente',
   },
+  REGISTER: {
+    TITLE: 'Crear Cuenta',
+    SUBTITLE: 'Únete a MoraPack',
+    NAME_LABEL: 'Nombre Completo',
+    NAME_PLACEHOLDER: 'Tu nombre completo',
+    EMAIL_LABEL: 'Correo Electrónico',
+    EMAIL_PLACEHOLDER: 'usuario@ejemplo.com',
+    PHONE_LABEL: 'Número de Teléfono',
+    PHONE_PLACEHOLDER: '+1 234 567 8900',
+    PASSWORD_LABEL: 'Contraseña',
+    PASSWORD_PLACEHOLDER: '••••••••',
+    CONFIRM_PASSWORD_LABEL: 'Confirmar Contraseña',
+    CONFIRM_PASSWORD_PLACEHOLDER: '••••••••',
+    ACCEPT_TERMS: 'Acepto los términos y condiciones',
+    SUBMIT_BUTTON: 'Crear Cuenta',
+    LOGIN_LINK: '¿Ya tienes cuenta? Iniciar Sesión',
+    SUCCESS: 'Cuenta creada exitosamente',
+    ERROR: 'Error al crear la cuenta',
+    REGISTRATION_ERROR: 'Error al crear la cuenta',
+  },
 } as const;
 
 export const VALIDATION_MESSAGES = {

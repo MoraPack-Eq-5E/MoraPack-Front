@@ -9,10 +9,20 @@ export interface LoginCredentials {
   rememberMe?: boolean;
 }
 
+export interface RegisterCredentials {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: 'admin' | 'user';
   createdAt: string;
   updatedAt: string;

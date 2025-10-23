@@ -5,7 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../services/auth.service';
-import type { LoginCredentials, User, AuthError } from '@/types';
+import type { LoginCredentials, RegisterCredentials, User, AuthError } from '@/types';
 import { useCallback } from 'react';
 
 // Keys para query cache
@@ -86,6 +86,28 @@ export function useAuth() {
     },
   });
 
+  // Mutation para registro
+  const registerMutation = useMutation<
+    { user: User; token: string; refreshToken?: string },
+    Error,
+    RegisterCredentials
+  >({
+    mutationFn: authService.register,
+    onSuccess: (data) => {
+      setStoredToken(data.token, false); // No recordar por defecto en registro
+
+      if (data.refreshToken) {
+        localStorage.setItem(AUTH_KEYS.refreshToken, data.refreshToken);
+      }
+
+      queryClient.setQueryData(AUTH_KEYS.user, data.user);
+    },
+    onError: (error) => {
+      clearStorage();
+      console.error('Error en registro:', error);
+    },
+  });
+
   // Mutation para logout
   const logoutMutation = useMutation({
     mutationFn: authService.logout,
@@ -102,6 +124,11 @@ export function useAuth() {
     [loginMutation]
   );
 
+  const register = useCallback(
+    (credentials: RegisterCredentials) => registerMutation.mutateAsync(credentials),
+    [registerMutation]
+  );
+
   const logout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync();
@@ -115,7 +142,7 @@ export function useAuth() {
 
   // Estado de autenticación
   const isAuthenticated = !!user && !!getStoredToken();
-  const isLoading = isLoadingUser || loginMutation.isPending || logoutMutation.isPending;
+  const isLoading = isLoadingUser || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending;
 
   return {
     // Estado
@@ -126,12 +153,15 @@ export function useAuth() {
 
     // Acciones
     login,
+    register,
     logout,
 
     // Estados de mutaciones
     isLoggingIn: loginMutation.isPending,
+    isRegistering: registerMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
     loginError: loginMutation.error,
+    registerError: registerMutation.error,
   };
 }
 

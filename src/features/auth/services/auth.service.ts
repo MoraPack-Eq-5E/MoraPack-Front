@@ -3,7 +3,7 @@
  * Servicios para autenticación y gestión de sesiones
  */
 
-import type { LoginCredentials, AuthResponse } from '@/types';
+import type { LoginCredentials, RegisterCredentials, AuthResponse } from '@/types';
 import { API_BASE_URL } from '@/constants'; // Descomentar cuando se conecte al backend
 
 /**
@@ -69,6 +69,31 @@ export const authService = {
     if (!res.ok) {
       const err = await res.text().catch(() => '');
       throw new Error(err || 'Error al iniciar sesión');
+    }
+
+    return res.json();
+  },
+
+  /**
+   * Registra un nuevo usuario
+   * @param credentials - Datos del nuevo usuario
+   * @returns Respuesta con usuario y token
+   */
+  register: async (credentials: RegisterCredentials): Promise<AuthResponse> => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: credentials.name,
+        email: credentials.email,
+        phone: credentials.phone,
+        password: credentials.password,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(err || 'Error al crear la cuenta');
     }
 
     return res.json();

@@ -17,9 +17,8 @@ export function LoginPage() {
   };
 
   const handleRegisterClick = () => {
-    // TODO: Navegar a registro cuando se implemente
-    console.log('Navegar a registro');
-    // navigate({ to: '/register' });
+    // Navegar a registro
+    navigate({ to: '/register' });
   };
 
   return (
