@@ -5,7 +5,7 @@
  */
 
 // URLs y endpoints
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 // Configuración de la app
 export const APP_NAME = 'MoraPack Admin';

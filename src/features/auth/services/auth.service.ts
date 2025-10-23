@@ -4,7 +4,7 @@
  */
 
 import type { LoginCredentials, AuthResponse } from '@/types';
-// import { API_BASE_URL } from '@/constants'; // Descomentar cuando se conecte al backend
+import { API_BASE_URL } from '@/constants'; // Descomentar cuando se conecte al backend
 
 /**
  * Servicio de autenticación
@@ -36,7 +36,7 @@ export const authService = {
     // return response.json();
 
     // Mock temporal para desarrollo
-    return new Promise((resolve, reject) => {
+    /*return new Promise((resolve, reject) => {
       setTimeout(() => {
         // Simula validación de credenciales
         if (credentials.email && credentials.password) {
@@ -56,7 +56,22 @@ export const authService = {
           reject(new Error('Credenciales inválidas'));
         }
       }, 1000); // Simula latencia de red
+    });*/
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: credentials.email,
+        password: credentials.password,
+      }),
     });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(err || 'Error al iniciar sesión');
+    }
+
+    return res.json();
   },
 
   /**
@@ -97,7 +112,7 @@ export const authService = {
     // return response.json();
 
     // Mock temporal
-    return new Promise((resolve, reject) => {
+    /*return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (token) {
           resolve({
@@ -112,7 +127,22 @@ export const authService = {
           reject(new Error('Token inválido'));
         }
       }, 500);
+    });*/
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (!res.ok) throw new Error('No autorizado');
+
+    const me = await res.json(); // { email_: string }
+    return {
+      id: 'me',
+      email: me.email_ ?? '',
+      name: 'Usuario',
+      role: 'admin',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   },
 
   /**
