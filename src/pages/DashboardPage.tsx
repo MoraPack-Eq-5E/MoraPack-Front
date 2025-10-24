@@ -23,7 +23,6 @@ import {
   useAlerts,
   useSedes,
 } from '@/features/dashboard/hooks';
-import { LAYOUT } from '@/constants';
 
 export function DashboardPage() {
   const [selectedSede, setSelectedSede] = useState('lima');
@@ -46,8 +45,8 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="py-8">
-        <div className="px-8" style={{ marginLeft: `${LAYOUT.DASHBOARD_MARGIN_LEFT}px` }}>
+      <div className="py-4">
+        <div className="px-8">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -60,8 +59,8 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="py-8">
-      <div className="px-8" style={{ marginLeft: `${LAYOUT.DASHBOARD_MARGIN_LEFT}px` }}>
+    <div className="py-4">
+      <div className="px-8">
         {/* Header con selector de sede */}
         <DashboardHeader
           selectedSede={selectedSede}

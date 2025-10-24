@@ -35,6 +35,16 @@ export {
   type Sede
 } from './dashboard.types';
 
+// Tipos de aeropuertos
+export {
+  type Airport,
+  type Ciudad,
+  type Continente,
+  type EstadoAeropuerto,
+  type AirportFilters,
+  type TopOccupiedAirport
+} from './airport.types';
+
 // Tipos de API
 // export type { Report, Service, Community, Membership } from './api';
 

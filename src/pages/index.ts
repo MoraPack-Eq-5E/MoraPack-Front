@@ -12,6 +12,7 @@ export { RegisterPage } from './RegisterPage';
 export { DashboardPage } from './DashboardPage';
 export { EnVivoPage } from './EnVivoPage';
 export { SimulacionPage } from './SimulacionPage';
+export { AirportsPage } from './AirportsPage';
 // export { HomePage } from './home';
 // export { DashboardPage } from './dashboard';
 // export { ReportsPage } from './reports';

@@ -34,7 +34,7 @@ const menuItems: MenuItem[] = [
   },
   {
     id: 'aeropuertos',
-    label: 'Aereopuertos',
+    label: 'Aeropuertos',
     icon: <Plane size={24} />,
     path: '/aeropuertos',
   },

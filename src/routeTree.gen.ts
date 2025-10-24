@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSimulacionRouteImport } from './routes/_authenticated/simulacion'
 import { Route as AuthenticatedEnVivoRouteImport } from './routes/_authenticated/en-vivo'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedAeropuertosRouteImport } from './routes/_authenticated/aeropuertos'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -45,10 +46,17 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAeropuertosRoute =
+  AuthenticatedAeropuertosRouteImport.update({
+    id: '/aeropuertos',
+    path: '/aeropuertos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/register': typeof RegisterRoute
+  '/aeropuertos': typeof AuthenticatedAeropuertosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/en-vivo': typeof AuthenticatedEnVivoRoute
   '/simulacion': typeof AuthenticatedSimulacionRoute
@@ -56,6 +64,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/register': typeof RegisterRoute
+  '/aeropuertos': typeof AuthenticatedAeropuertosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/en-vivo': typeof AuthenticatedEnVivoRoute
   '/simulacion': typeof AuthenticatedSimulacionRoute
@@ -65,20 +74,34 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/register': typeof RegisterRoute
+  '/_authenticated/aeropuertos': typeof AuthenticatedAeropuertosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/en-vivo': typeof AuthenticatedEnVivoRoute
   '/_authenticated/simulacion': typeof AuthenticatedSimulacionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/register' | '/dashboard' | '/en-vivo' | '/simulacion'
+  fullPaths:
+    | '/'
+    | '/register'
+    | '/aeropuertos'
+    | '/dashboard'
+    | '/en-vivo'
+    | '/simulacion'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/register' | '/dashboard' | '/en-vivo' | '/simulacion'
+  to:
+    | '/'
+    | '/register'
+    | '/aeropuertos'
+    | '/dashboard'
+    | '/en-vivo'
+    | '/simulacion'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/register'
+    | '/_authenticated/aeropuertos'
     | '/_authenticated/dashboard'
     | '/_authenticated/en-vivo'
     | '/_authenticated/simulacion'
@@ -134,16 +157,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/aeropuertos': {
+      id: '/_authenticated/aeropuertos'
+      path: '/aeropuertos'
+      fullPath: '/aeropuertos'
+      preLoaderRoute: typeof AuthenticatedAeropuertosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAeropuertosRoute: typeof AuthenticatedAeropuertosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEnVivoRoute: typeof AuthenticatedEnVivoRoute
   AuthenticatedSimulacionRoute: typeof AuthenticatedSimulacionRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAeropuertosRoute: AuthenticatedAeropuertosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEnVivoRoute: AuthenticatedEnVivoRoute,
   AuthenticatedSimulacionRoute: AuthenticatedSimulacionRoute,
