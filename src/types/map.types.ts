@@ -39,6 +39,7 @@ export interface Vuelo {
     
     estado: EstadoVuelo;
     progreso: number; // 0-100
+    heading: number; // Dirección del vuelo en grados (0° = Norte, 90° = Este)
     
     paquetesABordo: number;
     capacidadUsada: number;

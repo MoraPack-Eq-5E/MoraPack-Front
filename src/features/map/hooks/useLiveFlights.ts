@@ -132,6 +132,7 @@ function mapActiveFlightToVuelo(af: ActiveFlight): Vuelo {
         longitudDestino: af.destinationLng,
         estado: af.status as 'SCHEDULED' | 'IN_FLIGHT' | 'LANDED',
         progreso: af.progressPercentage,
+        heading: af.heading, // Dirección calculada con curva Bézier en el backend
         paquetesABordo: af.packagesOnBoard.length,
         capacidadUsada: af.capacityUsed,
         capacidadMax: af.capacityMax,
