@@ -1,18 +1,27 @@
 /**
  * SimulacionPage
  * 
- * Página que muestra el mapa de vuelos en modo simulación.
- * Conecta con el backend en modo "simulation" para visualizar escenarios de prueba.
+ * Página de visualización en tiempo real de simulaciones
  * 
- * El layout (TopBar y Sidebar) es manejado por el Layout Route (_authenticated).
+ * TODO: Integrar con flujo completo:
+ * 1. Seleccionar/iniciar simulación
+ * 2. Esperar a que ALNS complete
+ * 3. Cargar visualización
+ * 4. Mostrar mapa con polling
  */
 
+import { useState } from 'react';
 import { MapView } from '@/features/map/components';
 
 export function SimulacionPage() {
+  // TODO: Obtener esto de un state management o URL params
+  // Por ahora hardcoded para testing
+  const [simulationId] = useState<number | null>(15);
+
   return (
     <div className="h-full">
-      <MapView mode="simulation" />
+      {/* TODO: Agregar UI para seleccionar simulación */}
+      <MapView simulationId={simulationId} />
     </div>
   );
 }

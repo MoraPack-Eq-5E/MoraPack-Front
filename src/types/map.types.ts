@@ -1,17 +1,13 @@
 /**
- *  Entidades del dominio
- *  (shape canon para el front)
- *
+ * Entidades del dominio para el mapa en tiempo real
  */
-export type EstadoVuelo = 'CONFIRMADO' | 'CON_RETRASO' | 'EN_CAMINO' | 'FINALIZADO';
 
-/**
- * Modo de visualización del mapa
- */
+export type EstadoVuelo = 'SCHEDULED' | 'IN_FLIGHT' | 'LANDED';
+
 export type MapMode = 'live' | 'simulation';
 
 export interface Aeropuerto {
-    id: number,
+    id: number;
     codigo: string;
     capMaxAlmacen: number;
     cantActual: number;
@@ -20,28 +16,31 @@ export interface Aeropuerto {
     longitud: number;
 }
 
+/**
+ * Vuelo en tiempo real (simplificado del backend)
+ */
 export interface Vuelo {
     id: number;
     codigo: string;
-
+    
     ciudadOrigen: string;
     ciudadDestino: string;
-
-    horaOrigen: string; // ISO string (DateTime). Ej: "2025-08-28T13:15:14Z"
-    horaDestino: string;
-
-    husoOrigen: number;
-    husoDestino: number;
-
-    capacidadMax: number;
-    esIntercontinental: boolean;
-
-    estado: EstadoVuelo;
-
+    codigoOrigen: string;
+    codigoDestino: string;
+    
     latitudActual: number;
     longitudActual: number;
-
-    /** ---- Campos opcionales útiles SOLO para el mapa en vivo ---- */
-    headingDeg?: number;    // rumbo 0-359, para rotar el ícono (simulación/UI)
-    speedKts?: number;      // nudos, para animación
+    
+    // Coordenadas de origen y destino para dibujar ruta
+    latitudOrigen: number;
+    longitudOrigen: number;
+    latitudDestino: number;
+    longitudDestino: number;
+    
+    estado: EstadoVuelo;
+    progreso: number; // 0-100
+    
+    paquetesABordo: number;
+    capacidadUsada: number;
+    capacidadMax: number;
 }
