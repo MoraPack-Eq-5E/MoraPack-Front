@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay } from '@/features/map/components';
+import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend } from '@/features/map/components';
 import { useLiveFlights, useMapStats, useAirportsForMap } from '@/features/map/hooks';
 import type { Vuelo } from '@/types/map.types';
 
@@ -118,6 +118,9 @@ export function MapView({ simulationId }: MapViewProps) {
           now={status?.currentSimulatedTime || new Date().toISOString()}
         />
       </MapCanvas>
+      
+      {/* Leyenda de colores de ocupación */}
+      {loadingStatus === 'ready' && <OccupancyLegend />}
       
       {/* Indicador de vuelo seleccionado */}
       {selectedFlight && loadingStatus === 'ready' && (
