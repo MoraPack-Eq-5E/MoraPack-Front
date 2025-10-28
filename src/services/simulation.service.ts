@@ -85,11 +85,25 @@ export async function getSimulationStatus(
 
 /**
  * Controla la simulación (pause/resume/stop/setSpeed)
+ * @throws Error si la acción no es válida o la simulación no está activa
  */
 export async function controlSimulation(
   simulationId: number,
   request: SimulationControlRequest
 ): Promise<SimulationStatusResponse> {
+  // Validación en el cliente
+  if (!simulationId || simulationId <= 0) {
+    throw new Error('ID de simulación inválido');
+  }
+
+  if (!request.action) {
+    throw new Error('Acción de control requerida');
+  }
+
+  if (request.action === 'setSpeed' && (!request.newSpeed || request.newSpeed < 1)) {
+    throw new Error('Velocidad debe ser mayor a 0');
+  }
+
   const response = await fetch(
     `${API_BASE}/api/simulations/${simulationId}/control`,
     {
@@ -102,7 +116,9 @@ export async function controlSimulation(
   );
 
   if (!response.ok) {
-    throw new Error(`Error al controlar simulación: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.message || `Error al controlar simulación: ${response.statusText}`;
+    throw new Error(errorMessage);
   }
 
   return response.json();

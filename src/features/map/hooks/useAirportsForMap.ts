@@ -75,6 +75,8 @@ function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
     pais: airport.ciudad?.pais || 'Desconocido',
     latitud: parseDMSToDecimal(airport.latitud),
     longitud: parseDMSToDecimal(airport.longitud),
+    // Si el estado es null/undefined, usar DISPONIBLE por defecto
+    estado: (airport.estado as 'DISPONIBLE' | 'NO_DISPONIBLE') || 'DISPONIBLE',
   };
 }
 

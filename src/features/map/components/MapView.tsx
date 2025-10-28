@@ -6,10 +6,10 @@
  * @param simulationId - ID de la simulación activa en el backend
  */
 
-import { useState } from 'react';
-import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend } from '@/features/map/components';
-import { useLiveFlights, useMapStats, useAirportsForMap } from '@/features/map/hooks';
-import type { Vuelo } from '@/types/map.types';
+import { useState, useEffect, useMemo } from 'react';
+import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend, SimulationCompleteModal, SimulationControls, EventFeed } from '@/features/map/components';
+import { useLiveFlights, useMapStats, useAirportsForMap, useSimulationEvents } from '@/features/map/hooks';
+import type { Vuelo, Aeropuerto } from '@/types/map.types';
 
 interface MapViewProps {
   simulationId: number | null;
@@ -22,10 +22,35 @@ export function MapView({ simulationId }: MapViewProps) {
   const { flights, status, loadingStatus, error } = useLiveFlights(simulationId, POLLING_INTERVAL);
   const stats = useMapStats(flights);
   
+  // Hook para gestionar eventos de simulación
+  const { filteredEvents } = useSimulationEvents(status?.recentEvents, {
+    maxEvents: 50,
+    autoScroll: true,
+    enableFilters: false,
+  });
+  
   // Estado para el vuelo seleccionado (para mostrar su ruta)
   const [selectedFlight, setSelectedFlight] = useState<Vuelo | null>(null);
   
+  // Estado para el aeropuerto seleccionado (para mostrar todas sus rutas)
+  const [selectedAirport, setSelectedAirport] = useState<Aeropuerto | null>(null);
+  
+  // Estado para el modal de simulación completada
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completedSimulationData, setCompletedSimulationData] = useState<any>(null);
+  
+  // Detectar cuando la simulación termina
+  useEffect(() => {
+    if (status?.status === 'COMPLETED' && !showCompleteModal) {
+      setCompletedSimulationData(status);
+      setShowCompleteModal(true);
+    }
+  }, [status?.status, showCompleteModal]);
+  
   const handleFlightClick = (vuelo: Vuelo) => {
+    // Deseleccionar aeropuerto si estaba seleccionado
+    setSelectedAirport(null);
+    
     // Si clickean el mismo vuelo, deseleccionar
     if (selectedFlight?.id === vuelo.id) {
       setSelectedFlight(null);
@@ -33,6 +58,29 @@ export function MapView({ simulationId }: MapViewProps) {
       setSelectedFlight(vuelo);
     }
   };
+  
+  const handleAirportClick = (airport: Aeropuerto) => {
+    // Deseleccionar vuelo si estaba seleccionado
+    setSelectedFlight(null);
+    
+    // Si clickean el mismo aeropuerto, deseleccionar
+    if (selectedAirport?.id === airport.id) {
+      setSelectedAirport(null);
+    } else {
+      setSelectedAirport(airport);
+    }
+  };
+  
+  // Filtrar vuelos que salen o llegan al aeropuerto seleccionado
+  const airportFlights = useMemo(() => {
+    if (!selectedAirport) return [];
+    
+    return flights.filter(
+      (flight) =>
+        flight.codigoOrigen === selectedAirport.codigo ||
+        flight.codigoDestino === selectedAirport.codigo
+    );
+  }, [selectedAirport, flights]);
 
   // Cargando aeropuertos
   if (airportsLoading) {
@@ -93,13 +141,23 @@ export function MapView({ simulationId }: MapViewProps) {
       <MapCanvas className="h-full w-full">
         {/* Aeropuertos */}
         {airports.map((airport) => (
-          <AirportMarker key={airport.id} airport={airport} />
+          <AirportMarker 
+            key={airport.id} 
+            airport={airport}
+            onClick={handleAirportClick}
+            isSelected={selectedAirport?.id === airport.id}
+          />
         ))}
         
         {/* Línea de ruta del vuelo seleccionado */}
         {selectedFlight && (
           <FlightRoute vuelo={selectedFlight} />
         )}
+        
+        {/* Líneas de rutas del aeropuerto seleccionado */}
+        {selectedAirport && airportFlights.map((flight) => (
+          <FlightRoute key={flight.id} vuelo={flight} />
+        ))}
         
         {/* Vuelos en tiempo real */}
         {flights.map((flight) => (
@@ -119,12 +177,35 @@ export function MapView({ simulationId }: MapViewProps) {
         />
       </MapCanvas>
       
+      {/* Panel derecho: Controles + Eventos */}
+      {loadingStatus === 'ready' && simulationId && status && (
+        <div className="absolute top-4 right-4 z-[1000] w-[340px] flex flex-col gap-4">
+          {/* Controles de simulación */}
+          <SimulationControls
+            simulationId={simulationId}
+            currentStatus={status.status}
+            currentSpeed={status.timeScale || 112}
+            onStatusChange={() => {
+              // El hook useLiveFlights ya hace polling automático
+              // No necesitamos hacer nada extra aquí
+            }}
+          />
+          
+          {/* Feed de eventos en tiempo real */}
+          <EventFeed
+            events={filteredEvents}
+            maxHeight="400px"
+            enableSearch={false}
+          />
+        </div>
+      )}
+      
       {/* Leyenda de colores de ocupación */}
       {loadingStatus === 'ready' && <OccupancyLegend />}
       
       {/* Indicador de vuelo seleccionado */}
       {selectedFlight && loadingStatus === 'ready' && (
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200">
+        <div className="absolute bottom-24 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200 z-[1000]">
           <div className="text-sm font-medium text-gray-700">
             Ruta: {selectedFlight.codigo}
           </div>
@@ -138,6 +219,48 @@ export function MapView({ simulationId }: MapViewProps) {
             Ocultar ruta
           </button>
         </div>
+      )}
+      
+      {/* Indicador de aeropuerto seleccionado */}
+      {selectedAirport && loadingStatus === 'ready' && (
+        <div className="absolute bottom-24 left-4 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200 z-[1000]">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="text-lg font-bold text-gray-900">
+              {selectedAirport.codigo}
+            </div>
+            <div className={`px-2 py-0.5 rounded text-xs font-medium ${
+              selectedAirport.estado === 'DISPONIBLE' 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+              {selectedAirport.estado === 'DISPONIBLE' ? 'Activo' : 'Inactivo'}
+            </div>
+          </div>
+          <div className="text-xs text-gray-600 mb-1">
+            {selectedAirport.pais}
+          </div>
+          <div className="text-sm font-medium text-blue-600 mb-2">
+            {airportFlights.length} vuelos conectados
+          </div>
+          <div className="text-xs text-gray-500 mb-2">
+            Ocupación: {selectedAirport.cantActual}/{selectedAirport.capMaxAlmacen} paquetes
+          </div>
+          <button
+            onClick={() => setSelectedAirport(null)}
+            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+          >
+            Ocultar rutas
+          </button>
+        </div>
+      )}
+      
+      {/* Modal de simulación completada */}
+      {completedSimulationData && (
+        <SimulationCompleteModal
+          isOpen={showCompleteModal}
+          onClose={() => setShowCompleteModal(false)}
+          simulationData={completedSimulationData}
+        />
       )}
     </div>
   );

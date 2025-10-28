@@ -6,4 +6,5 @@ export { TopOccupiedChart } from './TopOccupiedChart';
 export { AirportFilters } from './AirportFilters';
 export { AirportGrid } from './AirportGrid';
 export { AirportPagination } from './AirportPagination';
+export { ConfirmToggleModal } from './ConfirmToggleModal';
 

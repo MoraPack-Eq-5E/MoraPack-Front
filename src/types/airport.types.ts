@@ -12,7 +12,7 @@ export type Continente = 'AMERICA' | 'EUROPA' | 'ASIA' | 'AFRICA' | 'OCEANIA';
 /**
  * Estados posibles de un aeropuerto
  */
-export type EstadoAeropuerto = 'DISPONIBLE' | 'MANTENIMIENTO' | 'CERRADO';
+export type EstadoAeropuerto = 'DISPONIBLE' | 'NO_DISPONIBLE';
 
 /**
  * Ciudad asociada a un aeropuerto

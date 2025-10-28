@@ -14,6 +14,7 @@ export interface Aeropuerto {
     pais: string;
     latitud: number;
     longitud: number;
+    estado: 'DISPONIBLE' | 'NO_DISPONIBLE';
 }
 
 /**
