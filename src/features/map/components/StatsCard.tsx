@@ -13,6 +13,27 @@ interface StatsCardProps {
 }
 
 export function StatsCard({ flightsInAir, slaPct, warehousePct, now }: StatsCardProps) {
+  // Formatear los porcentajes (redondear a enteros)
+  const formattedSLA = Math.round(slaPct);
+  const formattedWarehouse = Math.round(warehousePct);
+  
+  // Formatear la fecha para mostrar solo la parte legible
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
     <div className="absolute left-8 top-8 md:top-10 z-[1000]">
       <div className="w-[300px] rounded-xl border bg-white/95 shadow p-4">
@@ -20,11 +41,11 @@ export function StatsCard({ flightsInAir, slaPct, warehousePct, now }: StatsCard
           <div className="text-3xl font-semibold">{flightsInAir}</div>
           <div className="text-xs text-gray-500">
             <div>
-              <span className="font-medium">{slaPct}%</span>{' '}
+              <span className="font-medium">{formattedSLA}%</span>{' '}
               <span className="opacity-70">SLA</span>
             </div>
             <div>
-              <span className="font-medium">{warehousePct}%</span>{' '}
+              <span className="font-medium">{formattedWarehouse}%</span>{' '}
               <span className="opacity-70">Capacidad almacenes</span>
             </div>
           </div>
@@ -32,7 +53,7 @@ export function StatsCard({ flightsInAir, slaPct, warehousePct, now }: StatsCard
         
         <div className="mt-4 border-t pt-3">
           <div className="text-sm font-medium">Tiempo real</div>
-          <div className="text-xs text-gray-600">{now}</div>
+          <div className="text-xs text-gray-600">{formatDate(now)}</div>
         </div>
       </div>
     </div>
