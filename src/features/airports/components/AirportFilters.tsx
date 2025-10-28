@@ -15,9 +15,8 @@ export interface AirportFiltersProps {
 
 const estadoOptions: SelectOption[] = [
   { value: 'all', label: 'Todos los estados' },
-  { value: 'DISPONIBLE', label: 'Operativo' },
-  { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
-  { value: 'CERRADO', label: 'Cerrado' },
+  { value: 'DISPONIBLE', label: 'Activo' },
+  { value: 'NO_DISPONIBLE', label: 'Inactivo' },
 ];
 
 const continenteOptions: SelectOption[] = [

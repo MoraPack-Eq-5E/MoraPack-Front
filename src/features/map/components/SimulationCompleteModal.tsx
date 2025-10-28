@@ -22,8 +22,8 @@ export function SimulationCompleteModal({
   const { metrics, currentSimulatedTime, progressPercentage } = simulationData;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 flex items-center justify-center z-[9999] pointer-events-none">
+      <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-gray-300 pointer-events-auto">
         {/* Header */}
         <div className="bg-green-600 text-white px-6 py-4 rounded-t-lg">
           <div className="flex items-center justify-between">
