@@ -47,6 +47,8 @@ export function FlightMarker({ vuelo, onClick }: FlightMarkerProps) {
             eventHandlers={{
                 click: handleClick,
             }}
+            // Asegurar que el avión esté siempre visible sobre la línea
+            zIndexOffset={1000}
         >
             <Popup>
                 <div className="space-y-1">
