@@ -1,3 +1,10 @@
+/**
+ * FlightMarker - Marcador de avión en el mapa
+ * 
+ * Usa la posición y heading calculados por el backend con curvas Bézier.
+ * Esto garantiza que todos los clientes vean exactamente la misma posición y dirección.
+ */
+
 import { Marker, Popup } from 'react-leaflet';
 import { DivIcon } from 'leaflet';
 import type { Vuelo, EstadoVuelo } from '@/types/map.types';
@@ -31,8 +38,12 @@ interface FlightMarkerProps {
 
 export function FlightMarker({ vuelo, onClick }: FlightMarkerProps) {
     const color = statusColor(vuelo.estado);
-    const heading = 90; // Default heading for now
-    const icon = useMemo(() => planeIcon(color, heading), [color, heading]);
+    
+    // Usar la posición calculada por el backend (ya incluye curva Bézier)
+    const position: [number, number] = [vuelo.latitudActual, vuelo.longitudActual];
+    
+    // Usar el heading calculado por el backend
+    const icon = useMemo(() => planeIcon(color, vuelo.heading), [color, vuelo.heading]);
 
     const handleClick = () => {
         if (onClick) {
@@ -42,7 +53,7 @@ export function FlightMarker({ vuelo, onClick }: FlightMarkerProps) {
 
     return (
         <Marker 
-            position={[vuelo.latitudActual, vuelo.longitudActual]} 
+            position={position} 
             icon={icon}
             eventHandlers={{
                 click: handleClick,

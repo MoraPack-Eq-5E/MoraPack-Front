@@ -33,6 +33,7 @@ export interface ActiveFlight {
   destinationCity: string;
   status: 'SCHEDULED' | 'IN_FLIGHT' | 'LANDED';
   progressPercentage: number;
+  heading: number; // Dirección del vuelo en grados (0° = Norte, 90° = Este)
   packagesOnBoard: number[];
   capacityUsed: number;
   capacityMax: number;
