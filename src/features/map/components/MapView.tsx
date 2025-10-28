@@ -6,8 +6,8 @@
  * @param simulationId - ID de la simulación activa en el backend
  */
 
-import { useState } from 'react';
-import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend } from '@/features/map/components';
+import { useState, useEffect } from 'react';
+import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend, SimulationCompleteModal } from '@/features/map/components';
 import { useLiveFlights, useMapStats, useAirportsForMap } from '@/features/map/hooks';
 import type { Vuelo } from '@/types/map.types';
 
@@ -24,6 +24,18 @@ export function MapView({ simulationId }: MapViewProps) {
   
   // Estado para el vuelo seleccionado (para mostrar su ruta)
   const [selectedFlight, setSelectedFlight] = useState<Vuelo | null>(null);
+  
+  // Estado para el modal de simulación completada
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completedSimulationData, setCompletedSimulationData] = useState<any>(null);
+  
+  // Detectar cuando la simulación termina
+  useEffect(() => {
+    if (status?.status === 'COMPLETED' && !showCompleteModal) {
+      setCompletedSimulationData(status);
+      setShowCompleteModal(true);
+    }
+  }, [status?.status, showCompleteModal]);
   
   const handleFlightClick = (vuelo: Vuelo) => {
     // Si clickean el mismo vuelo, deseleccionar
@@ -138,6 +150,15 @@ export function MapView({ simulationId }: MapViewProps) {
             Ocultar ruta
           </button>
         </div>
+      )}
+      
+      {/* Modal de simulación completada */}
+      {completedSimulationData && (
+        <SimulationCompleteModal
+          isOpen={showCompleteModal}
+          onClose={() => setShowCompleteModal(false)}
+          simulationData={completedSimulationData}
+        />
       )}
     </div>
   );
