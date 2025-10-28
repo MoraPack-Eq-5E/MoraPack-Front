@@ -11,3 +11,5 @@ export * from './LoadingOverlay';
 export * from './MapView';
 export * from './OccupancyLegend';
 export * from './SimulationCompleteModal';
+export * from './SimulationControls';
+export * from './EventFeed';

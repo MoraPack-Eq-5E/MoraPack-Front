@@ -85,10 +85,16 @@ export interface StartVisualizationRequest {
   autoStart?: boolean;
 }
 
+// Control actions type
+export type SimulationControlAction = 'pause' | 'resume' | 'stop' | 'setSpeed';
+
 export interface SimulationControlRequest {
-  action: 'pause' | 'resume' | 'stop' | 'setSpeed';
+  action: SimulationControlAction;
   newSpeed?: number;
 }
+
+// Response after control action
+export type SimulationControlResponse = SimulationStatusResponse;
 
 export interface StartSimulationRequest {
   diasSimulacion?: number;
@@ -104,5 +110,20 @@ export interface SimulationInitResponse {
   simulacionId: number;
   mensaje: string;
   estado: string;
+}
+
+// Event Feed Configuration
+export interface EventFeedConfig {
+  maxEvents: number;
+  showTimestamp: boolean;
+  enableFilters: boolean;
+  autoScroll: boolean;
+}
+
+export type EventCategory = 'FLIGHT' | 'WAREHOUSE' | 'ORDER' | 'ALERT' | 'ALL';
+
+export interface EventFilter {
+  categories: EventCategory[];
+  searchTerm?: string;
 }
 
