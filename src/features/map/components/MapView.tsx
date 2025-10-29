@@ -6,7 +6,7 @@
  * @param simulationId - ID de la simulación activa en el backend
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend, SimulationCompleteModal, SimulationControls, EventFeed } from '@/features/map/components';
 import { useLiveFlights, useMapStats, useAirportsForMap, useSimulationEvents } from '@/features/map/hooks';
 import type { Vuelo, Aeropuerto } from '@/types/map.types';
@@ -39,13 +39,25 @@ export function MapView({ simulationId }: MapViewProps) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completedSimulationData, setCompletedSimulationData] = useState<any>(null);
   
-  // Detectar cuando la simulación termina
+  // Ref para asegurar que solo capturamos los datos una vez cuando se completa
+  const hasCompletedRef = useRef(false);
+  
+  // Detectar cuando la simulación termina y capturar datos solo UNA VEZ
   useEffect(() => {
-    if (status?.status === 'COMPLETED' && !showCompleteModal) {
+    if (status?.status === 'COMPLETED' && !hasCompletedRef.current) {
+      // Capturar datos en el momento exacto que se completa
+      hasCompletedRef.current = true;
       setCompletedSimulationData(status);
       setShowCompleteModal(true);
     }
-  }, [status?.status, showCompleteModal]);
+  }, [status?.status]);
+  
+  // Resetear el ref cuando cambia la simulación
+  useEffect(() => {
+    hasCompletedRef.current = false;
+    setShowCompleteModal(false);
+    setCompletedSimulationData(null);
+  }, [simulationId]);
   
   const handleFlightClick = (vuelo: Vuelo) => {
     // Deseleccionar aeropuerto si estaba seleccionado
