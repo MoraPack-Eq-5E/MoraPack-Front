@@ -32,8 +32,8 @@ export function MapView({ simulationId }: MapViewProps) {
   // Estado para el vuelo seleccionado (para mostrar su ruta)
   const [selectedFlight, setSelectedFlight] = useState<Vuelo | null>(null);
   
-  // Estado para el aeropuerto seleccionado (para mostrar todas sus rutas)
-  const [selectedAirport, setSelectedAirport] = useState<Aeropuerto | null>(null);
+  // Estado para el aeropuerto seleccionado (código IATA para buscar en warehouses)
+  const [selectedAirportCode, setSelectedAirportCode] = useState<string | null>(null);
   
   // Estado para el modal de simulación completada
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -61,7 +61,7 @@ export function MapView({ simulationId }: MapViewProps) {
   
   const handleFlightClick = (vuelo: Vuelo) => {
     // Deseleccionar aeropuerto si estaba seleccionado
-    setSelectedAirport(null);
+    setSelectedAirportCode(null);
     
     // Si clickean el mismo vuelo, deseleccionar
     if (selectedFlight?.id === vuelo.id) {
@@ -76,23 +76,51 @@ export function MapView({ simulationId }: MapViewProps) {
     setSelectedFlight(null);
     
     // Si clickean el mismo aeropuerto, deseleccionar
-    if (selectedAirport?.id === airport.id) {
-      setSelectedAirport(null);
+    if (selectedAirportCode === airport.codigo) {
+      setSelectedAirportCode(null);
     } else {
-      setSelectedAirport(airport);
+      setSelectedAirportCode(airport.codigo);
     }
   };
   
+  // Obtener datos del aeropuerto seleccionado desde warehouses (datos en tiempo real)
+  const selectedAirportWarehouse = useMemo(() => {
+    if (!selectedAirportCode || !status?.warehouses) return null;
+    return status.warehouses.find(w => w.code === selectedAirportCode);
+  }, [selectedAirportCode, status?.warehouses]);
+  
+  // Obtener información completa del aeropuerto (combinar datos estáticos con datos en tiempo real)
+  const selectedAirportFull = useMemo(() => {
+    if (!selectedAirportCode) return null;
+    
+    // Buscar en lista estática para datos básicos
+    const staticAirport = airports.find(a => a.codigo === selectedAirportCode);
+    if (!staticAirport) return null;
+    
+    // Combinar con datos en tiempo real si están disponibles
+    const warehouse = selectedAirportWarehouse;
+    if (warehouse) {
+      return {
+        ...staticAirport,
+        cantActual: warehouse.current, // Usar datos actualizados de la simulación
+        capMaxAlmacen: warehouse.capacity,
+        isPrincipal: warehouse.isPrincipal,
+      };
+    }
+    
+    return staticAirport;
+  }, [selectedAirportCode, airports, selectedAirportWarehouse]);
+  
   // Filtrar vuelos que salen o llegan al aeropuerto seleccionado
   const airportFlights = useMemo(() => {
-    if (!selectedAirport) return [];
+    if (!selectedAirportCode) return [];
     
     return flights.filter(
       (flight) =>
-        flight.codigoOrigen === selectedAirport.codigo ||
-        flight.codigoDestino === selectedAirport.codigo
+        flight.codigoOrigen === selectedAirportCode ||
+        flight.codigoDestino === selectedAirportCode
     );
-  }, [selectedAirport, flights]);
+  }, [selectedAirportCode, flights]);
 
   // Cargando aeropuertos
   if (airportsLoading) {
@@ -151,15 +179,39 @@ export function MapView({ simulationId }: MapViewProps) {
       />
 
       <MapCanvas className="h-full w-full">
-        {/* Aeropuertos */}
-        {airports.map((airport) => (
-          <AirportMarker 
-            key={airport.id} 
-            airport={airport}
-            onClick={handleAirportClick}
-            isSelected={selectedAirport?.id === airport.id}
-          />
-        ))}
+        {/* Aeropuertos - usar warehouses de la simulación si están disponibles para datos actualizados */}
+        {(status?.warehouses && status.warehouses.length > 0 
+          ? status.warehouses.map((warehouse) => {
+              // Buscar aeropuerto estático para datos básicos
+              const staticAirport = airports.find(a => a.codigo === warehouse.code);
+              if (!staticAirport) return null;
+              
+              // Combinar datos estáticos con datos en tiempo real
+              const airportWithRealTime: Aeropuerto = {
+                ...staticAirport,
+                cantActual: warehouse.current, // Datos actualizados de la simulación
+                capMaxAlmacen: warehouse.capacity,
+                isPrincipal: warehouse.isPrincipal,
+              };
+              
+              return (
+                <AirportMarker 
+                  key={warehouse.warehouseId} 
+                  airport={airportWithRealTime}
+                  onClick={handleAirportClick}
+                  isSelected={selectedAirportCode === warehouse.code}
+                />
+              );
+            })
+          : airports.map((airport) => (
+              <AirportMarker 
+                key={airport.id} 
+                airport={airport}
+                onClick={handleAirportClick}
+                isSelected={selectedAirportCode === airport.codigo}
+              />
+            ))
+        ).filter(Boolean)}
         
         {/* Línea de ruta del vuelo seleccionado */}
         {selectedFlight && (
@@ -167,7 +219,7 @@ export function MapView({ simulationId }: MapViewProps) {
         )}
         
         {/* Líneas de rutas del aeropuerto seleccionado */}
-        {selectedAirport && airportFlights.map((flight) => (
+        {selectedAirportCode && airportFlights.map((flight) => (
           <FlightRoute key={flight.id} vuelo={flight} />
         ))}
         
@@ -189,7 +241,7 @@ export function MapView({ simulationId }: MapViewProps) {
         />
       </MapCanvas>
       
-      {/* Panel derecho: Controles + Eventos */}
+      {/* Panel derecho: Controles + Eventos + Tracking */}
       {loadingStatus === 'ready' && simulationId && status && (
         <div className="absolute top-4 right-4 z-[1000] w-[340px] flex flex-col gap-4">
           {/* Controles de simulación */}
@@ -234,31 +286,41 @@ export function MapView({ simulationId }: MapViewProps) {
       )}
       
       {/* Indicador de aeropuerto seleccionado */}
-      {selectedAirport && loadingStatus === 'ready' && (
+      {selectedAirportFull && loadingStatus === 'ready' && (
         <div className="absolute bottom-24 left-4 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200 z-[1000]">
           <div className="flex items-center gap-2 mb-2">
             <div className="text-lg font-bold text-gray-900">
-              {selectedAirport.codigo}
+              {selectedAirportFull.codigo}
             </div>
+            {selectedAirportFull.isPrincipal && (
+              <div className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                Sede MoraPack
+              </div>
+            )}
             <div className={`px-2 py-0.5 rounded text-xs font-medium ${
-              selectedAirport.estado === 'DISPONIBLE' 
+              selectedAirportFull.estado === 'DISPONIBLE' 
                 ? 'bg-green-100 text-green-700' 
                 : 'bg-gray-100 text-gray-600'
             }`}>
-              {selectedAirport.estado === 'DISPONIBLE' ? 'Activo' : 'Inactivo'}
+              {selectedAirportFull.estado === 'DISPONIBLE' ? 'Activo' : 'Inactivo'}
             </div>
           </div>
           <div className="text-xs text-gray-600 mb-1">
-            {selectedAirport.pais}
+            {selectedAirportFull.pais}
           </div>
           <div className="text-sm font-medium text-blue-600 mb-2">
             {airportFlights.length} vuelos conectados
           </div>
           <div className="text-xs text-gray-500 mb-2">
-            Ocupación: {selectedAirport.cantActual}/{selectedAirport.capMaxAlmacen} paquetes
+            Ocupación: {selectedAirportFull.cantActual}/{selectedAirportFull.capMaxAlmacen} paquetes
+            {selectedAirportWarehouse && (
+              <span className="ml-2 text-amber-600 font-medium">
+                ({Math.round(selectedAirportWarehouse.occupancyPercentage)}%)
+              </span>
+            )}
           </div>
           <button
-            onClick={() => setSelectedAirport(null)}
+            onClick={() => setSelectedAirportCode(null)}
             className="text-xs text-blue-600 hover:text-blue-800 mt-1"
           >
             Ocultar rutas
