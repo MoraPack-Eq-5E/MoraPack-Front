@@ -15,6 +15,7 @@ export interface Aeropuerto {
     latitud: number;
     longitud: number;
     estado: 'DISPONIBLE' | 'NO_DISPONIBLE';
+    isPrincipal?: boolean; // Indica si es una sede principal de MoraPack
 }
 
 /**
