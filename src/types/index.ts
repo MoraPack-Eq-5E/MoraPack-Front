@@ -54,3 +54,12 @@ export {
 // Tipos de utilidades
 // export type { Nullable, AsyncState } from './utils';
 
+// Tipos de carga de archivos
+export {
+  type FileValidationResult,
+  type FileUploadValidationResponse,
+  type UploadedFile,
+  type UploadFilesState,
+  SimulationFileType
+} from './fileUpload.types';
+

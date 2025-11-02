@@ -104,6 +104,7 @@ export interface StartSimulationRequest {
   modoDebug?: boolean;
   factorAceleracion?: number;
   autoStartVisualization?: boolean;
+  uploadSessionId?: string; // ID de sesión para datos temporales subidos
 }
 
 export interface SimulationInitResponse {
