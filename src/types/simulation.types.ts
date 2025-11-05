@@ -16,6 +16,7 @@ export interface SimulationStatusResponse {
   metrics: SimulationMetrics;
   recentEvents: SimulationEvent[];
   timeScale: number;
+  packageTracking?: PackageTrackingDTO[];
 }
 
 export interface ActiveFlight {
@@ -126,5 +127,28 @@ export type EventCategory = 'FLIGHT' | 'WAREHOUSE' | 'ORDER' | 'ALERT' | 'ALL';
 export interface EventFilter {
   categories: EventCategory[];
   searchTerm?: string;
+}
+
+export type PackageTrackingStatus = 
+  | 'EN_ORIGEN' 
+  | 'EN_VUELO' 
+  | 'EN_ESCALA' 
+  | 'EN_DESTINO_ESPERANDO' 
+  | 'ENTREGADO_PARCIAL' 
+  | 'ENTREGADO_TOTAL';
+
+export interface PackageTrackingDTO {
+  packageId: number;
+  totalProducts: number;
+  productsDelivered: number;
+  productsInFlight: number;
+  productsAtWarehouse: Record<string, number>;
+  status: PackageTrackingStatus;
+  finalDestinationCode: string;
+  currentAirportCode?: string;
+  currentFlightId?: number;
+  lastUpdateTime: string;
+  deliveryPercentage: number;
+  isFullyDelivered: boolean;
 }
 

@@ -64,6 +64,11 @@ function parseDMSToDecimal(dms: string): number {
 }
 
 /**
+ * Aeropuertos principales de MoraPack (sedes)
+ */
+const MAIN_AIRPORTS = new Set(['SPIM', 'UBBB', 'EBCI']);
+
+/**
  * Convierte un aeropuerto del backend al formato del mapa
  */
 function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
@@ -77,6 +82,8 @@ function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
     longitud: parseDMSToDecimal(airport.longitud),
     // Si el estado es null/undefined, usar DISPONIBLE por defecto
     estado: (airport.estado as 'DISPONIBLE' | 'NO_DISPONIBLE') || 'DISPONIBLE',
+    // Marcar si es un aeropuerto principal
+    isPrincipal: MAIN_AIRPORTS.has(airport.codigoIATA),
   };
 }
 

@@ -12,7 +12,7 @@
  * - Badges por tipo de evento
  * - Timestamps formateados
  * 
- * @author Senior Developer
+ 
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -209,36 +209,38 @@ export function EventFeed({
         )}
       </div>
 
-      {/* Lista de eventos */}
+      {/* Contenido */}
       {isExpanded && (
         <div
           ref={scrollRef}
-          className="overflow-y-auto p-4 custom-scrollbar"
+          className="overflow-y-auto custom-scrollbar"
           style={{ maxHeight }}
         >
-          {filteredEvents.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <svg
-                className="w-12 h-12 mx-auto mb-3 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                />
-              </svg>
-              <p className="text-sm font-medium">No hay eventos aún</p>
-              <p className="text-xs mt-1">Los eventos aparecerán aquí en tiempo real</p>
-            </div>
-          ) : (
-            filteredEvents.map((event) => (
-              <EventItem key={event.id} event={event} onClick={onEventClick} />
-            ))
-          )}
+          <div className="p-4">
+            {filteredEvents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <svg
+                  className="w-12 h-12 mx-auto mb-3 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-sm font-medium">No hay eventos aún</p>
+                <p className="text-xs mt-1">Los eventos aparecerán aquí en tiempo real</p>
+              </div>
+            ) : (
+              filteredEvents.map((event) => (
+                <EventItem key={event.id} event={event} onClick={onEventClick} />
+              ))
+            )}
+          </div>
         </div>
       )}
 
