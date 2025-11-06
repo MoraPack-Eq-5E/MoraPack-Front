@@ -74,7 +74,7 @@ const MAIN_AIRPORTS = new Set(['SPIM', 'UBBB', 'EBCI']);
 function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
   return {
     id: airport.id,
-    codigo: airport.codigoIATA,
+    codigoIATA: airport.codigoIATA,
     capMaxAlmacen: airport.capacidadMaxima,
     cantActual: airport.capacidadActual,
     pais: airport.ciudad?.pais || 'Desconocido',
