@@ -1,40 +1,41 @@
 /**
- * SimulacionPage
+ * SimulacionPage - ACTUALIZADO
  * 
  * Página con flujo multi-paso para simulaciones:
  * 1. Carga de archivos (opcional)
- * 2. Configuración de parámetros
- * 3. Ejecución de simulación
- * 4. Visualización en tiempo real
+ * 2. Configuración de parámetros del algoritmo
+ * 3. Ejecución del algoritmo ALNS
+ * 4. Visualización con player local (frontend)
  */
 
 import { useState } from 'react';
 import { MapView } from '@/features/map/components';
 import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import { startSimulation, startVisualization, getSimulationState } from '@/services/simulation.service';
-import type { StartSimulationRequest } from '@/types/simulation.types';
+import { iniciarSimulacion, SimulationPlayer, type ResultadoAlgoritmoDTO } from '@/services/simulation.service';
+import type { EjecutarAlgoritmoRequest } from '@/services/algoritmo.service';
 
 type SimulationStep = 'upload' | 'config' | 'running' | 'visualization';
 
 export function SimulacionPage() {
   const [currentStep, setCurrentStep] = useState<SimulationStep>('upload');
-  const [uploadSessionId, setUploadSessionId] = useState<string | undefined>();
-  const [simulationId, setSimulationId] = useState<number | null>(null);
+  const [filesImported, setFilesImported] = useState(false);
+  const [player, setPlayer] = useState<SimulationPlayer | null>(null);
+  const [resultado, setResultado] = useState<ResultadoAlgoritmoDTO | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Configuración de la simulación
-  const [config, setConfig] = useState<StartSimulationRequest>({
-    diasSimulacion: 7,
-    iteracionesAlns: 500,
-    tiempoLimiteSegundos: 5400, // 90 minutos
-    habilitarUnitizacion: true,
-    modoDebug: false,
-    factorAceleracion: 100,
+  // Configuración del algoritmo
+  const [config, setConfig] = useState<EjecutarAlgoritmoRequest>({
+    fuente: 'BASE_DE_DATOS',
+    maxIteraciones: 500,
+    temperaturaInicial: 10000.0,
+    factorEnfriamiento: 0.995,
   });
   
-  const handleFileValidationSuccess = (sessionId: string) => {
-    setUploadSessionId(sessionId);
+  const handleFileImportSuccess = () => {
+    setFilesImported(true);
+    // Cuando se importan archivos, usar fuente ARCHIVOS
+    setConfig({ ...config, fuente: 'BASE_DE_DATOS' });
   };
   
   const handleContinueToConfig = () => {
@@ -42,63 +43,48 @@ export function SimulacionPage() {
   };
   
   const handleSkipUpload = () => {
-    setUploadSessionId(undefined);
+    setFilesImported(false);
+    setConfig({ ...config, fuente: 'BASE_DE_DATOS' });
     setCurrentStep('config');
   };
   
   const handleStartSimulation = async () => {
     setIsStarting(true);
     setError(null);
+    setCurrentStep('running');
     
     try {
-      const request: StartSimulationRequest = {
-        ...config,
-        uploadSessionId,
-      };
+      // Ejecutar algoritmo y obtener player
+      const { resultado: res, player: newPlayer } = await iniciarSimulacion(config);
       
-      const response = await startSimulation(request);
-      setSimulationId(response.simulacionId);
-      setCurrentStep('running');
-      
-      // Polling para verificar cuando termina
-      pollSimulationStatus(response.simulacionId);
-    } catch (err) {
-      console.error('Error starting simulation:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setResultado(res);
+      setPlayer(newPlayer);
+      setCurrentStep('visualization');
       setIsStarting(false);
+      
+          console.log('Algoritmo ejecutado exitosamente:', {
+            rutasProductos: res.rutasProductos.length,
+            costoTotal: res.costoTotal,
+            eventosSimulacion: res.lineaDeTiempo?.totalEventos || 0
+          });
+    } catch (err) {
+      console.error('Error ejecutando algoritmo:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido al ejecutar algoritmo');
+      setIsStarting(false);
+      setCurrentStep('config');
     }
   };
   
-  const pollSimulationStatus = async (simId: number) => {
-    const checkStatus = async () => {
-      try {
-        const state = await getSimulationState(simId);
-        
-        if (state.estado === 'COMPLETADA') {
-          // Simulación completada, iniciar visualización
-          await startVisualization(simId);
-          setCurrentStep('visualization');
-          setIsStarting(false);
-        } else if (state.estado === 'ERROR') {
-          setError('La simulación terminó con error');
-          setIsStarting(false);
-        } else {
-          // Seguir polling
-          setTimeout(checkStatus, 5000); // Cada 5 segundos
-        }
-      } catch (err) {
-        console.error('Error checking simulation status:', err);
-        setTimeout(checkStatus, 5000);
-      }
-    };
-    
-    checkStatus();
-  };
-  
   const handleRestart = () => {
+    // Limpiar player anterior
+    if (player) {
+      player.destroy();
+    }
+    
     setCurrentStep('upload');
-    setUploadSessionId(undefined);
-    setSimulationId(null);
+    setFilesImported(false);
+    setPlayer(null);
+    setResultado(null);
     setError(null);
   };
   
@@ -160,7 +146,7 @@ export function SimulacionPage() {
               Paso 1: Cargar archivos de datos (opcional)
             </h2>
             
-            <FileUploadSection onValidationSuccess={handleFileValidationSuccess} />
+            <FileUploadSection onValidationSuccess={handleFileImportSuccess} />
             
             <div className="mt-6 flex gap-3">
               <button
@@ -170,12 +156,12 @@ export function SimulacionPage() {
                 Omitir y usar datos del sistema
               </button>
               
-              {uploadSessionId && (
+              {filesImported && (
                 <button
                   onClick={handleContinueToConfig}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                 >
-                  Continuar con archivos validados
+                  Continuar con archivos importados
                 </button>
               )}
             </div>
@@ -188,10 +174,10 @@ export function SimulacionPage() {
               Paso 2: Configurar simulación
             </h2>
             
-            {uploadSessionId && (
+            {filesImported && (
               <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-sm text-green-800">
-                  ✓ Se usarán los archivos validados para esta simulación
+                  ✓ Los archivos han sido importados a la base de datos
                 </p>
               </div>
             )}
@@ -199,55 +185,63 @@ export function SimulacionPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Días de simulación
+                  Fuente de datos
                 </label>
-                <input
-                  type="number"
-                  value={config.diasSimulacion}
-                  onChange={(e) => setConfig({ ...config, diasSimulacion: parseInt(e.target.value) })}
+                <select
+                  value={config.fuente}
+                  onChange={(e) => setConfig({ ...config, fuente: e.target.value as 'ARCHIVOS' | 'BASE_DE_DATOS' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  min={1}
-                  max={30}
-                />
+                >
+                  <option value="BASE_DE_DATOS">Base de datos</option>
+                  <option value="ARCHIVOS">Archivos (data/)</option>
+                </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Iteraciones ALNS
+                  Máximo de iteraciones ALNS
                 </label>
                 <input
                   type="number"
-                  value={config.iteracionesAlns}
-                  onChange={(e) => setConfig({ ...config, iteracionesAlns: parseInt(e.target.value) })}
+                  value={config.maxIteraciones}
+                  onChange={(e) => setConfig({ ...config, maxIteraciones: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   min={1}
+                  max={10000}
                 />
+                <p className="text-xs text-gray-500 mt-1">Recomendado: 100-1000 iteraciones</p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tiempo límite (segundos)
+                  Temperatura inicial
                 </label>
                 <input
                   type="number"
-                  value={config.tiempoLimiteSegundos}
-                  onChange={(e) => setConfig({ ...config, tiempoLimiteSegundos: parseInt(e.target.value) })}
+                  value={config.temperaturaInicial}
+                  onChange={(e) => setConfig({ ...config, temperaturaInicial: parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  min={0}
+                  min={1000}
+                  max={100000}
+                  step={1000}
                 />
+                <p className="text-xs text-gray-500 mt-1">Recomendado: 10000</p>
               </div>
               
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="unitizacion"
-                  checked={config.habilitarUnitizacion}
-                  onChange={(e) => setConfig({ ...config, habilitarUnitizacion: e.target.checked })}
-                  className="rounded"
-                />
-                <label htmlFor="unitizacion" className="text-sm text-gray-700">
-                  Habilitar unitización de productos
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Factor de enfriamiento
                 </label>
+                <input
+                  type="number"
+                  value={config.factorEnfriamiento}
+                  onChange={(e) => setConfig({ ...config, factorEnfriamiento: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  min={0.9}
+                  max={0.999}
+                  step={0.001}
+                />
+                <p className="text-xs text-gray-500 mt-1">Recomendado: 0.995</p>
               </div>
             </div>
             
@@ -283,28 +277,39 @@ export function SimulacionPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Ejecutando algoritmo ALNS...
               </h2>
-              <p className="text-gray-600">
-                Esto puede tomar varios minutos. La visualización comenzará automáticamente cuando termine.
+              <p className="text-gray-600 mb-4">
+                Calculando rutas óptimas. Esto puede tomar algunos segundos.
+              </p>
+              <p className="text-sm text-gray-500">
+                Configuración: {config.maxIteraciones} iteraciones, temp. inicial {config.temperaturaInicial}
               </p>
             </div>
           </div>
         )}
         
-        {currentStep === 'visualization' && simulationId !== null && (
+        {currentStep === 'visualization' && player !== null && resultado !== null && (
           <div className="h-full flex flex-col">
-            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Visualización en Tiempo Real
-              </h2>
-              <button
-                onClick={handleRestart}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
-              >
-                Nueva simulación
-              </button>
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Visualización de Simulación
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {resultado.rutasProductos.length} productos con rutas | Costo total: ${resultado.costoTotal?.toFixed(2) || 0} | 
+                    {resultado.lineaDeTiempo?.totalEventos || 0} eventos
+                  </p>
+                </div>
+                <button
+                  onClick={handleRestart}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                >
+                  Nueva simulación
+                </button>
+              </div>
             </div>
             <div className="flex-1">
-              <MapView simulationId={simulationId} />
+              <MapView player={player} resultado={resultado} />
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState, useRef, DragEvent } from 'react';
+import { useState, useRef, type DragEvent } from 'react';
 import { ValidationResults } from './ValidationResults';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { SimulationFileType } from '@/types/fileUpload.types';
@@ -6,7 +6,6 @@ import { SimulationFileType } from '@/types/fileUpload.types';
 interface FileInputCardProps {
   title: string;
   description: string;
-  fileType: SimulationFileType;
   file?: File;
   onFileSelect: (file: File) => void;
   onFileRemove: () => void;
@@ -15,7 +14,6 @@ interface FileInputCardProps {
 function FileInputCard({
   title,
   description,
-  fileType,
   file,
   onFileSelect,
   onFileRemove,
@@ -174,7 +172,6 @@ export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProp
         <FileInputCard
           title="Aeropuertos"
           description="aeropuertosinfo.txt"
-          fileType={SimulationFileType.AEROPUERTOS}
           file={filesState.aeropuertos?.file}
           onFileSelect={(file) => addFile(file, SimulationFileType.AEROPUERTOS)}
           onFileRemove={() => removeFile(SimulationFileType.AEROPUERTOS)}
@@ -183,7 +180,6 @@ export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProp
         <FileInputCard
           title="Vuelos"
           description="vuelos.txt"
-          fileType={SimulationFileType.VUELOS}
           file={filesState.vuelos?.file}
           onFileSelect={(file) => addFile(file, SimulationFileType.VUELOS)}
           onFileRemove={() => removeFile(SimulationFileType.VUELOS)}
@@ -192,7 +188,6 @@ export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProp
         <FileInputCard
           title="Pedidos"
           description="pedidos.txt"
-          fileType={SimulationFileType.PEDIDOS}
           file={filesState.pedidos?.file}
           onFileSelect={(file) => addFile(file, SimulationFileType.PEDIDOS)}
           onFileRemove={() => removeFile(SimulationFileType.PEDIDOS)}
@@ -221,7 +216,7 @@ export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProp
             disabled={filesState.isValidating}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed font-medium transition-colors"
           >
-            {filesState.isValidating ? 'Validando...' : 'Validar archivos'}
+            {filesState.isValidating ? 'Importando...' : 'Importar archivos a BD'}
           </button>
         )}
         

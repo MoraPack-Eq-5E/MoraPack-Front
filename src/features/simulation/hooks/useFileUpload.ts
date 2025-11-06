@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { validateSimulationFiles, validateFileSize, validateFileType } from '@/services/fileUpload.service';
+import { importAirports, importFlights, importOrders } from '@/services/dataImport.service';
+import { validateFileSize, validateFileType } from '@/services/fileUpload.service';
 import type {
   UploadFilesState,
   UploadedFile,
@@ -13,7 +14,6 @@ import type {
 export function useFileUpload() {
   const [filesState, setFilesState] = useState<UploadFilesState>({
     isValidating: false,
-    usingDatabaseFallback: false,
   });
   
   const [clientErrors, setClientErrors] = useState<string[]>([]);
@@ -70,32 +70,65 @@ export function useFileUpload() {
   };
   
   /**
-   * Valida los archivos subidos
+   * Valida e importa los archivos subidos secuencialmente a la BD
    */
   const validateFiles = async (): Promise<FileUploadValidationResponse | null> => {
     setFilesState((prev) => ({ ...prev, isValidating: true }));
     setClientErrors([]);
     
     try {
-      const response = await validateSimulationFiles(
-        filesState.aeropuertos?.file,
-        filesState.vuelos?.file,
-        filesState.pedidos?.file
-      );
+      const results: string[] = [];
+      let totalCount = 0;
+      
+      // 1. Importar aeropuertos (primero, requerido para vuelos y pedidos)
+      if (filesState.aeropuertos?.file) {
+        const airportsResult = await importAirports(filesState.aeropuertos.file);
+        if (!airportsResult.success) {
+          throw new Error(`Error al importar aeropuertos: ${airportsResult.message}`);
+        }
+        results.push(`✓ ${airportsResult.count} aeropuertos importados`);
+        totalCount += airportsResult.count || 0;
+      }
+      
+      // 2. Importar vuelos (requiere aeropuertos)
+      if (filesState.vuelos?.file) {
+        const flightsResult = await importFlights(filesState.vuelos.file);
+        if (!flightsResult.success) {
+          throw new Error(`Error al importar vuelos: ${flightsResult.message}`);
+        }
+        results.push(`✓ ${flightsResult.count} vuelos importados`);
+        totalCount += flightsResult.count || 0;
+      }
+      
+      // 3. Importar pedidos (requiere aeropuertos)
+      if (filesState.pedidos?.file) {
+        const ordersResult = await importOrders(filesState.pedidos.file);
+        if (!ordersResult.success) {
+          throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
+        }
+        results.push(`✓ Pedidos importados correctamente`);
+      }
+      
+      const response: FileUploadValidationResponse = {
+        success: true,
+        message: results.join('\n'),
+        sessionId: 'imported', // Ya no usamos sessionId real, solo flag
+        usingDatabaseFallback: false,
+      };
       
       setFilesState((prev) => ({
         ...prev,
         isValidating: false,
         validationResponse: response,
-        sessionId: response.sessionId,
+        sessionId: 'imported',
       }));
       
       return response;
     } catch (error) {
-      console.error('Error validating files:', error);
+      console.error('Error importing files:', error);
       setFilesState((prev) => ({ ...prev, isValidating: false }));
       setClientErrors([
-        error instanceof Error ? error.message : 'Error desconocido al validar archivos',
+        error instanceof Error ? error.message : 'Error desconocido al importar archivos',
       ]);
       return null;
     }

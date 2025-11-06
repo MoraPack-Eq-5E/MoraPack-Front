@@ -101,11 +101,20 @@ export interface StartSimulationRequest {
   diasSimulacion?: number;
   tiempoLimiteSegundos?: number;
   iteracionesAlns?: number;
-  habilitarUnitizacion?: boolean;
   modoDebug?: boolean;
   factorAceleracion?: number;
   autoStartVisualization?: boolean;
-  uploadSessionId?: string; // ID de sesión para datos temporales subidos
+}
+
+// Resultado de importación de archivos
+export interface ImportResult {
+  success: boolean;
+  message: string;
+  count?: number;
+  cities?: number;
+  orders?: number;
+  products?: number;
+  error?: string;
 }
 
 export interface SimulationInitResponse {
