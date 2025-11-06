@@ -184,9 +184,9 @@ export function FlightDetailsModal({
             )}
             {flight.productIds && flight.productIds.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-gray-500 mb-1">Cantidad de Productos</div>
+                <div className="text-xs font-medium text-gray-500 mb-1">Producto ID</div>
                 <div className="text-base font-semibold text-gray-900">
-                  {flight.productIds.length}
+                  #{flight.productIds[0]}
                 </div>
               </div>
             )}

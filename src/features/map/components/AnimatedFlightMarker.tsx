@@ -133,17 +133,19 @@ export function AnimatedFlightMarker({
       });
 
       // Agregar popup con info del vuelo
+      const productLine = flight.productIds[0] != null 
+        ? `<div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Producto #${flight.productIds[0]}</div>`
+        : '';
+      
       marker.bindPopup(`
         <div style="min-width: 200px; font-family: sans-serif;">
-          <strong style="font-size: 16px;">✈️ ${flight.flightCode}</strong><br/>
+          <strong style="font-size: 16px;">Vuelo ${flight.flightCode}</strong><br/>
           <div style="margin: 8px 0; color: #6b7280;">
             ${flight.originCode} → ${flight.destinationCode}
           </div>
-          <div style="font-size: 13px; color: #374151;">
-            Progreso: ${(flight.currentProgress * 100).toFixed(1)}%
-          </div>
-          <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-            Productos: ${flight.productIds.length}
+          ${productLine}
+          <div style="font-size: 13px; color: #374151; margin-top: 6px;">
+            Progreso: <strong>${(flight.currentProgress * 100).toFixed(0)}%</strong>
           </div>
         </div>
       `, { offset: [0, -10] });

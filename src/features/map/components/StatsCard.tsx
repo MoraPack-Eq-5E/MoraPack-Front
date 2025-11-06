@@ -1,61 +1,30 @@
 /**
- * StatsCard Component
+ * StatsCard
  * 
- * Tarjeta de estadísticas flotante que muestra métricas en tiempo real del mapa.
- * Se posiciona absolutamente sobre el mapa en la esquina superior izquierda.
+ * Tarjeta de estadística para mostrar métricas de simulación.
+ * Se muestra en la parte inferior del mapa.
  */
 
 interface StatsCardProps {
-  flightsInAir: number;
-  slaPct: number;
-  warehousePct: number;
-  now: string;
+  label: string;
+  value: string | number;
+  sublabel?: string;
 }
 
-export function StatsCard({ flightsInAir, slaPct, warehousePct, now }: StatsCardProps) {
-  // Formatear los porcentajes (redondear a enteros)
-  const formattedSLA = Math.round(slaPct);
-  const formattedWarehouse = Math.round(warehousePct);
-  
-  // Formatear la fecha para mostrar solo la parte legible
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString('es-ES', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
+export function StatsCard({ label, value, sublabel }: StatsCardProps) {
   return (
-    <div className="absolute left-8 top-8 md:top-10 z-[1000]">
-      <div className="w-[300px] rounded-xl border bg-white/95 shadow p-4">
-        <div className="flex items-center justify-between">
-          <div className="text-3xl font-semibold">{flightsInAir}</div>
-          <div className="text-xs text-gray-500">
-            <div>
-              <span className="font-medium">{formattedSLA}%</span>{' '}
-              <span className="opacity-70">SLA</span>
-            </div>
-            <div>
-              <span className="font-medium">{formattedWarehouse}%</span>{' '}
-              <span className="opacity-70">Capacidad almacenes</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 border-t pt-3">
-          <div className="text-sm font-medium">Tiempo real</div>
-          <div className="text-xs text-gray-600">{formatDate(now)}</div>
-        </div>
+    <div className="bg-teal-600/95 rounded-xl p-4 shadow-xl backdrop-blur-sm">
+      <div className="text-xs font-semibold uppercase tracking-wider text-teal-100 mb-1">
+        {label}
       </div>
+      <div className="text-3xl font-black tracking-tight text-white">
+        {value}
+      </div>
+      {sublabel && (
+        <div className="text-xs text-teal-200 mt-1">
+          {sublabel}
+        </div>
+      )}
     </div>
   );
 }
