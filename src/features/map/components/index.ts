@@ -13,3 +13,4 @@ export * from './OccupancyLegend';
 export * from './SimulationCompleteModal';
 export * from './SimulationControls';
 export * from './EventFeed';
+export * from './DiaView';
