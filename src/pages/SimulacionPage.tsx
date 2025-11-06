@@ -1,92 +1,218 @@
 /**
- * SimulacionPage - ACTUALIZADO
+ * SimulacionPage - ACTUALIZADO PARA ESCENARIO SEMANAL
  * 
- * Página con flujo multi-paso para simulaciones:
- * 1. Carga de archivos (opcional)
- * 2. Configuración de parámetros del algoritmo
- * 3. Ejecución del algoritmo ALNS
- * 4. Visualización con player local (frontend)
+ * Página con flujo de 3 pasos siguiendo frontend.md:
+ * 1. Cargar pedidos desde archivos a BD (POST /api/datos/cargar-pedidos)
+ * 2. Ejecutar algoritmo semanal (POST /api/algoritmo/semanal)
+ * 3. Consultar y visualizar resultados (GET /api/consultas/*)
  */
 
-import { useState } from 'react';
-import { MapView } from '@/features/map/components';
+import { useState, useMemo } from 'react';
 import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import { iniciarSimulacion, SimulationPlayer, type ResultadoAlgoritmoDTO } from '@/services/simulation.service';
-import type { EjecutarAlgoritmoRequest } from '@/services/algoritmo.service';
+import { cargarPedidos, obtenerEstadoDatos, type CargaDatosResponse, type EstadoDatosResponse } from '@/services/cargaDatos.service';
+import { ejecutarAlgoritmoSemanal, type AlgoritmoRequest, type AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
+import { consultarEstadisticasAsignacion, consultarVuelos, consultarPedidos } from '@/services/consultas.service';
+import { MapView } from '@/features/map/components';
+import { useAirportsForMap } from '@/features/map/hooks';
+import { SimulationPlayer } from '@/services/simulation-player.service';
 
-type SimulationStep = 'upload' | 'config' | 'running' | 'visualization';
+type SimulationStep = 'load-data' | 'config' | 'running' | 'results';
 
 export function SimulacionPage() {
-  const [currentStep, setCurrentStep] = useState<SimulationStep>('upload');
-  const [filesImported, setFilesImported] = useState(false);
-  const [player, setPlayer] = useState<SimulationPlayer | null>(null);
-  const [resultado, setResultado] = useState<ResultadoAlgoritmoDTO | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<SimulationStep>('load-data');
+  
+  // Estado de carga de datos
+  const [dataCargada, setDataCargada] = useState(false);
+  const [resultadoCarga, setResultadoCarga] = useState<CargaDatosResponse | null>(null);
+  const [estadoDatos, setEstadoDatos] = useState<EstadoDatosResponse | null>(null);
+  
+  // Estado del algoritmo
+  const [resultadoAlgoritmo, setResultadoAlgoritmo] = useState<AlgoritmoResponse | null>(null);
+  
+  // Estados de UI
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Configuración del algoritmo
-  const [config, setConfig] = useState<EjecutarAlgoritmoRequest>({
-    fuente: 'BASE_DE_DATOS',
-    maxIteraciones: 500,
-    temperaturaInicial: 10000.0,
-    factorEnfriamiento: 0.995,
+  // Hook para obtener aeropuertos
+  const { airports, isLoading: airportsLoading } = useAirportsForMap();
+  
+  // Crear SimulationPlayer cuando tengamos resultados y timeline
+  const simulationPlayer = useMemo(() => {
+    if (!resultadoAlgoritmo?.lineaDeTiempo || airports.length === 0) {
+      return null;
+    }
+    
+    console.log('🎬 Creando SimulationPlayer con:', {
+      eventos: resultadoAlgoritmo.lineaDeTiempo.eventos?.length || 0,
+      aeropuertos: airports.length,
+      inicio: resultadoAlgoritmo.lineaDeTiempo.horaInicioSimulacion,
+      fin: resultadoAlgoritmo.lineaDeTiempo.horaFinSimulacion,
+    });
+    
+    const player = new SimulationPlayer(airports);
+    player.loadTimeline(resultadoAlgoritmo.lineaDeTiempo);
+    return player;
+  }, [resultadoAlgoritmo, airports]);
+  
+  // Configuración del algoritmo semanal
+  const [config, setConfig] = useState<AlgoritmoRequest>({
+    horaInicioSimulacion: '2025-01-02T00:00:00',
+    duracionSimulacionDias: 7,
+    usarBaseDatos: true,
+    maxIteraciones: 1000,
+    tasaDestruccion: 0.3,
+    habilitarUnitizacion: true,
+    diasHorizonte: 4,
   });
   
-  const handleFileImportSuccess = () => {
-    setFilesImported(true);
-    // Cuando se importan archivos, usar fuente ARCHIVOS
-    setConfig({ ...config, fuente: 'BASE_DE_DATOS' });
+  // ==================== PASO 1: CARGA DE DATOS ====================
+  
+  const handleFileImportSuccess = async (sessionId?: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Los archivos ya fueron importados a BD por FileUploadSection
+      // Solo necesitamos consultar el estado
+      console.log('✅ Archivos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
+      console.log('📊 Consultando estado de base de datos...');
+      
+      // Obtener estado de datos desde BD
+      const estado = await obtenerEstadoDatos();
+      setEstadoDatos(estado);
+      setDataCargada(true);
+      
+      console.log('✅ Datos disponibles en BD:', estado.estadisticas);
+      
+      // Crear un resultado simulado para mostrar en la UI
+      setResultadoCarga({
+        exito: true,
+        mensaje: 'Archivos cargados exitosamente desde tu equipo',
+        estadisticas: {
+          pedidosCargados: estado.estadisticas.totalPedidos,
+          pedidosCreados: estado.estadisticas.totalPedidos,
+          pedidosFiltrados: 0,
+          erroresParseo: 0,
+          erroresArchivos: 0,
+          duracionSegundos: 0,
+        },
+        tiempoInicio: new Date().toISOString(),
+        tiempoFin: new Date().toISOString(),
+      });
+      
+    } catch (err) {
+      console.error('❌ Error consultando datos:', err);
+      setError(err instanceof Error ? err.message : 'Error al consultar datos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleCargarDatosSinArchivos = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log('📥 Cargando pedidos desde directorio del servidor...');
+      const resultado = await cargarPedidos({
+        horaInicio: config.horaInicioSimulacion,
+        horaFin: calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!),
+      });
+      
+      setResultadoCarga(resultado);
+      setDataCargada(true);
+      
+      // Obtener estado de datos
+      const estado = await obtenerEstadoDatos();
+      setEstadoDatos(estado);
+      
+      console.log('✅ Datos cargados:', resultado.estadisticas);
+      
+    } catch (err) {
+      console.error('❌ Error cargando datos:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar datos');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleContinueToConfig = () => {
     setCurrentStep('config');
+    setError(null);
   };
   
-  const handleSkipUpload = () => {
-    setFilesImported(false);
-    setConfig({ ...config, fuente: 'BASE_DE_DATOS' });
-    setCurrentStep('config');
-  };
+  // ==================== PASO 2: EJECUTAR ALGORITMO ====================
   
   const handleStartSimulation = async () => {
-    setIsStarting(true);
+    setIsLoading(true);
     setError(null);
     setCurrentStep('running');
     
     try {
-      // Ejecutar algoritmo y obtener player
-      const { resultado: res, player: newPlayer } = await iniciarSimulacion(config);
+      console.log('🚀 Ejecutando algoritmo semanal...');
+      console.log('Configuración:', config);
       
-      setResultado(res);
-      setPlayer(newPlayer);
-      setCurrentStep('visualization');
-      setIsStarting(false);
+      const resultado = await ejecutarAlgoritmoSemanal(config);
       
-          console.log('Algoritmo ejecutado exitosamente:', {
-            rutasProductos: res.rutasProductos.length,
-            costoTotal: res.costoTotal,
-            eventosSimulacion: res.lineaDeTiempo?.totalEventos || 0
-          });
+      setResultadoAlgoritmo(resultado);
+      
+      console.log('✅ Algoritmo completado:', {
+        productosAsignados: resultado.totalProductos,
+        costoTotal: resultado.costoTotal,
+        segundosEjecucion: resultado.tiempoEjecucionSegundos,
+      });
+      
+      // Esperar un momento para que se persistan los datos
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCurrentStep('results');
+      
     } catch (err) {
-      console.error('Error ejecutando algoritmo:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido al ejecutar algoritmo');
-      setIsStarting(false);
+      console.error('❌ Error ejecutando algoritmo:', err);
+      setError(err instanceof Error ? err.message : 'Error al ejecutar algoritmo');
       setCurrentStep('config');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // ==================== PASO 3: CONSULTAR RESULTADOS ====================
+  
+  const handleVerResultados = async () => {
+    try {
+      // Consultar estadísticas finales
+      const estadisticas = await consultarEstadisticasAsignacion();
+      const vuelos = await consultarVuelos();
+      const pedidos = await consultarPedidos();
+      
+      console.log('📊 Resultados consultados:', {
+        estadisticas,
+        totalVuelos: vuelos.totalVuelos,
+        totalPedidos: pedidos.totalPedidos,
+      });
+    } catch (err) {
+      console.error('Error consultando resultados:', err);
     }
   };
   
   const handleRestart = () => {
-    // Limpiar player anterior
-    if (player) {
-      player.destroy();
-    }
-    
-    setCurrentStep('upload');
-    setFilesImported(false);
-    setPlayer(null);
-    setResultado(null);
+    setCurrentStep('load-data');
+    setDataCargada(false);
+    setResultadoCarga(null);
+    setEstadoDatos(null);
+    setResultadoAlgoritmo(null);
     setError(null);
   };
+  
+  // ==================== UTILIDADES ====================
+  
+  function calcularHoraFin(horaInicio: string, dias: number): string {
+    const fecha = new Date(horaInicio);
+    fecha.setDate(fecha.getDate() + dias);
+    return fecha.toISOString().slice(0, 19);
+  }
+  
+  // ==================== RENDER ====================
   
   return (
     <div className="h-full flex flex-col">
@@ -95,44 +221,44 @@ export function SimulacionPage() {
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <StepIndicator
             number={1}
-            title="Archivos"
-            isActive={currentStep === 'upload'}
-            isCompleted={currentStep !== 'upload'}
+            title="Cargar Datos"
+            isActive={currentStep === 'load-data'}
+            isCompleted={currentStep !== 'load-data'}
           />
           <div className="flex-1 h-1 bg-gray-200 mx-4">
             <div className={`h-full bg-blue-600 transition-all ${
-              currentStep !== 'upload' ? 'w-full' : 'w-0'
+              currentStep !== 'load-data' ? 'w-full' : 'w-0'
             }`} />
           </div>
           
           <StepIndicator
             number={2}
-            title="Configuración"
+            title="Configurar"
             isActive={currentStep === 'config'}
-            isCompleted={currentStep === 'running' || currentStep === 'visualization'}
+            isCompleted={currentStep === 'running' || currentStep === 'results'}
           />
           <div className="flex-1 h-1 bg-gray-200 mx-4">
             <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'running' || currentStep === 'visualization' ? 'w-full' : 'w-0'
+              currentStep === 'running' || currentStep === 'results' ? 'w-full' : 'w-0'
             }`} />
           </div>
           
           <StepIndicator
             number={3}
-            title="Ejecución"
+            title="Ejecutar"
             isActive={currentStep === 'running'}
-            isCompleted={currentStep === 'visualization'}
+            isCompleted={currentStep === 'results'}
           />
           <div className="flex-1 h-1 bg-gray-200 mx-4">
             <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'visualization' ? 'w-full' : 'w-0'
+              currentStep === 'results' ? 'w-full' : 'w-0'
             }`} />
           </div>
           
           <StepIndicator
             number={4}
-            title="Visualización"
-            isActive={currentStep === 'visualization'}
+            title="Resultados"
+            isActive={currentStep === 'results'}
             isCompleted={false}
           />
         </div>
@@ -140,28 +266,134 @@ export function SimulacionPage() {
       
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {currentStep === 'upload' && (
+        {currentStep === 'load-data' && (
           <div className="max-w-6xl mx-auto p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Paso 1: Cargar archivos de datos (opcional)
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Paso 1: Cargar Pedidos a Base de Datos
             </h2>
+            <p className="text-gray-600 mb-6">
+              Carga archivos de pedidos desde tu equipo o usa los archivos del servidor
+            </p>
             
-            <FileUploadSection onValidationSuccess={handleFileImportSuccess} />
+            {/* Configuración de ventana de tiempo */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold text-blue-900 mb-3">Ventana de Tiempo - Escenario Semanal</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    Fecha de inicio
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={config.horaInicioSimulacion?.slice(0, 16)}
+                    onChange={(e) => setConfig({ ...config, horaInicioSimulacion: e.target.value + ':00' })}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    Duración (días)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.duracionSimulacionDias}
+                    onChange={(e) => setConfig({ ...config, duracionSimulacionDias: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min={1}
+                    max={30}
+                  />
+                  <p className="text-xs text-blue-700 mt-1">
+                    Se cargarán pedidos desde {config.horaInicioSimulacion} hasta {calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!)}
+                  </p>
+                </div>
+              </div>
+            </div>
             
-            <div className="mt-6 flex gap-3">
+            {/* Opción 1: Importar archivos */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">Opción 1: Subir archivos desde tu equipo</h3>
+            <FileUploadSection 
+              onValidationSuccess={handleFileImportSuccess} 
+              horaInicio={config.horaInicioSimulacion}
+              horaFin={calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!)}
+            />
+            </div>
+            
+            {/* Opción 2: Usar archivos del servidor */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">Opción 2: Usar archivos del servidor</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Carga pedidos desde el directorio <code className="bg-gray-100 px-2 py-1 rounded">data/</code> del servidor
+              </p>
               <button
-                onClick={handleSkipUpload}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                onClick={handleCargarDatosSinArchivos}
+                disabled={isLoading}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300 font-medium"
               >
-                Omitir y usar datos del sistema
+                {isLoading ? 'Cargando...' : 'Cargar desde servidor'}
               </button>
-              
-              {filesImported && (
+            </div>
+            
+            {/* Resultado de carga */}
+            {resultadoCarga && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-green-900 mb-2">✓ Datos cargados exitosamente</h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-green-700">Pedidos cargados</p>
+                    <p className="text-2xl font-bold text-green-900">{resultadoCarga.estadisticas.pedidosCargados}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-700">Pedidos creados</p>
+                    <p className="text-2xl font-bold text-green-900">{resultadoCarga.estadisticas.pedidosCreados}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-700">Duración</p>
+                    <p className="text-2xl font-bold text-green-900">{resultadoCarga.estadisticas.duracionSegundos}s</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Estado de la BD */}
+            {estadoDatos && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-gray-900 mb-2">Estado actual de la base de datos</h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Aeropuertos</p>
+                    <p className="text-lg font-semibold text-gray-900">{estadoDatos.estadisticas.totalAeropuertos}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Total pedidos</p>
+                    <p className="text-lg font-semibold text-gray-900">{estadoDatos.estadisticas.totalPedidos}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Pendientes</p>
+                    <p className="text-lg font-semibold text-gray-900">{estadoDatos.estadisticas.pedidosPendientes}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Solo mostrar error si NO hay datos cargados */}
+            {error && !dataCargada && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+            
+            {/* Botón de continuar - aparece cuando hay datos cargados */}
+            <div className="flex gap-3">
+              {dataCargada && (
                 <button
                   onClick={handleContinueToConfig}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
                 >
-                  Continuar con archivos importados
+                  <span>Continuar a configuración</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -170,33 +402,23 @@ export function SimulacionPage() {
         
         {currentStep === 'config' && (
           <div className="max-w-4xl mx-auto p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Paso 2: Configurar simulación
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Paso 2: Configurar Algoritmo Semanal
             </h2>
+            <p className="text-gray-600 mb-6">
+              Ajusta los parámetros del algoritmo ALNS para el escenario semanal (7 días)
+            </p>
             
-            {filesImported && (
+            {resultadoCarga && (
               <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-sm text-green-800">
-                  ✓ Los archivos han sido importados a la base de datos
+                  ✓ {resultadoCarga.estadisticas.pedidosCargados} pedidos listos para optimización
                 </p>
               </div>
             )}
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fuente de datos
-                </label>
-                <select
-                  value={config.fuente}
-                  onChange={(e) => setConfig({ ...config, fuente: e.target.value as 'ARCHIVOS' | 'BASE_DE_DATOS' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="BASE_DE_DATOS">Base de datos</option>
-                  <option value="ARCHIVOS">Archivos (data/)</option>
-                </select>
-              </div>
-              
+              <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Máximo de iteraciones ALNS
@@ -206,43 +428,65 @@ export function SimulacionPage() {
                   value={config.maxIteraciones}
                   onChange={(e) => setConfig({ ...config, maxIteraciones: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  min={1}
+                    min={100}
                   max={10000}
                 />
-                <p className="text-xs text-gray-500 mt-1">Recomendado: 100-1000 iteraciones</p>
+                  <p className="text-xs text-gray-500 mt-1">Recomendado: 1000 para semanal</p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Temperatura inicial
+                    Tasa de destrucción
                 </label>
                 <input
                   type="number"
-                  value={config.temperaturaInicial}
-                  onChange={(e) => setConfig({ ...config, temperaturaInicial: parseFloat(e.target.value) })}
+                    value={config.tasaDestruccion}
+                    onChange={(e) => setConfig({ ...config, tasaDestruccion: parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  min={1000}
-                  max={100000}
-                  step={1000}
-                />
-                <p className="text-xs text-gray-500 mt-1">Recomendado: 10000</p>
+                    min={0.1}
+                    max={0.5}
+                    step={0.05}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Recomendado: 0.3</p>
+                </div>
               </div>
               
+              <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Factor de enfriamiento
+                    Días de horizonte
                 </label>
                 <input
                   type="number"
-                  value={config.factorEnfriamiento}
-                  onChange={(e) => setConfig({ ...config, factorEnfriamiento: parseFloat(e.target.value) })}
+                    value={config.diasHorizonte}
+                    onChange={(e) => setConfig({ ...config, diasHorizonte: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  min={0.9}
-                  max={0.999}
-                  step={0.001}
-                />
-                <p className="text-xs text-gray-500 mt-1">Recomendado: 0.995</p>
+                    min={1}
+                    max={30}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Días de planificación adelantada</p>
+                </div>
+                
+                <div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.habilitarUnitizacion}
+                      onChange={(e) => setConfig({ ...config, habilitarUnitizacion: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Habilitar unitización</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">División automática de productos</p>
+                </div>
               </div>
+            </div>
+            
+            <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                ⚠️ El escenario semanal puede tardar entre <strong>30-90 minutos</strong> en completarse.
+                Por favor, mantén esta ventana abierta.
+              </p>
             </div>
             
             {error && (
@@ -253,18 +497,18 @@ export function SimulacionPage() {
             
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => setCurrentStep('upload')}
+                onClick={() => setCurrentStep('load-data')}
                 className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
               >
-                Volver
+                ← Volver
               </button>
               
               <button
                 onClick={handleStartSimulation}
-                disabled={isStarting}
+                disabled={isLoading}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300 font-medium"
               >
-                {isStarting ? 'Iniciando...' : 'Iniciar simulación'}
+                {isLoading ? 'Iniciando...' : 'Ejecutar algoritmo semanal 🚀'}
               </button>
             </div>
           </div>
@@ -275,31 +519,65 @@ export function SimulacionPage() {
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Ejecutando algoritmo ALNS...
+                Ejecutando Algoritmo ALNS Semanal...
               </h2>
               <p className="text-gray-600 mb-4">
-                Calculando rutas óptimas. Esto puede tomar algunos segundos.
+                Optimizando rutas para {config.duracionSimulacionDias} días de pedidos.
               </p>
-              <p className="text-sm text-gray-500">
-                Configuración: {config.maxIteraciones} iteraciones, temp. inicial {config.temperaturaInicial}
+              <p className="text-sm text-gray-500 mb-2">
+                Configuración: {config.maxIteraciones} iteraciones, destrucción {config.tasaDestruccion}
+              </p>
+              <p className="text-sm text-yellow-600 font-medium">
+                Esto puede tardar 30-90 minutos. Por favor espera...
               </p>
             </div>
           </div>
         )}
         
-        {currentStep === 'visualization' && player !== null && resultado !== null && (
+        {currentStep === 'results' && resultadoAlgoritmo && (
           <div className="h-full flex flex-col">
-            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Visualización de Simulación
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                    Resultados de Simulación Semanal
                   </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {resultado.rutasProductos.length} productos con rutas | Costo total: ${resultado.costoTotal?.toFixed(2) || 0} | 
-                    {resultado.lineaDeTiempo?.totalEventos || 0} eventos
+                  
+                  {/* Métricas principales */}
+                  <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <p className="text-xs text-green-700">Productos Asignados</p>
+                      <p className="text-2xl font-bold text-green-900">{resultadoAlgoritmo.productosAsignados}</p>
+                      <p className="text-xs text-green-600">{((resultadoAlgoritmo.productosAsignados / resultadoAlgoritmo.totalProductos) * 100).toFixed(1)}% de asignación</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <p className="text-xs text-blue-700">Pedidos Procesados</p>
+                      <p className="text-2xl font-bold text-blue-900">{resultadoAlgoritmo.pedidosAsignados}</p>
+                      <p className="text-xs text-blue-600">{resultadoAlgoritmo.totalPedidos} total</p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-3">
+                      <p className="text-xs text-purple-700">Costo Total</p>
+                      <p className="text-2xl font-bold text-purple-900">${resultadoAlgoritmo.costoTotal?.toFixed(2) || 0}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-700">Tiempo Ejecución</p>
+                      <p className="text-2xl font-bold text-gray-900">{Math.floor((resultadoAlgoritmo.tiempoEjecucionSegundos || 0) / 60)}m</p>
+                      <p className="text-xs text-gray-600">{resultadoAlgoritmo.tiempoEjecucionSegundos || 0}s</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600">
+                    Simulación: {resultadoAlgoritmo.horaInicioSimulacion && new Date(resultadoAlgoritmo.horaInicioSimulacion).toLocaleString()} - {resultadoAlgoritmo.horaFinSimulacion && new Date(resultadoAlgoritmo.horaFinSimulacion).toLocaleString()}
                   </p>
                 </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleVerResultados}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                  >
+                    Consultar detalles
+                  </button>
                 <button
                   onClick={handleRestart}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
@@ -308,8 +586,70 @@ export function SimulacionPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1">
-              <MapView player={player} resultado={resultado} />
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              {simulationPlayer && !airportsLoading ? (
+                <MapView 
+                  player={simulationPlayer} 
+                  resultado={resultadoAlgoritmo}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-gray-100">
+                  <div className="text-center p-8 max-w-xl">
+                    {airportsLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          Cargando aeropuertos...
+                        </h3>
+                        <p className="text-gray-600">
+                          Preparando visualización del mapa
+                        </p>
+                      </>
+                    ) : !resultadoAlgoritmo?.lineaDeTiempo ? (
+                      <>
+                        <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          Timeline no disponible
+                </h3>
+                <p className="text-gray-600 mb-4">
+                          El algoritmo completó, pero no retornó el timeline de simulación.
+                        </p>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left">
+                          <p className="text-sm text-yellow-900 mb-2">
+                            <strong>Posibles causas:</strong>
+                          </p>
+                          <ul className="text-xs text-yellow-800 space-y-1 list-disc list-inside">
+                            <li>El backend no generó eventos de vuelo</li>
+                            <li>No hay vuelos asignados en el resultado</li>
+                            <li>El campo <code className="bg-yellow-100 px-1 rounded">lineaDeTiempo</code> es null</li>
+                          </ul>
+                        </div>
+                <button
+                  onClick={handleVerResultados}
+                          className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                          Ver Detalles en Consola
+                </button>
+                      </>
+                    ) : airports.length === 0 ? (
+                      <>
+                        <div className="text-6xl mb-4">🌍</div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          No hay aeropuertos disponibles
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                          Debes cargar aeropuertos antes de ver la visualización.
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Ve a la página de "Aeropuertos" para cargar datos.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+              </div>
+              )}
             </div>
           </div>
         )}

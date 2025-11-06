@@ -28,8 +28,17 @@ export interface ActiveFlightState {
   departureTime: Date;
   arrivalTime: Date;
   currentProgress: number; // 0-1
-  packageIds: number[];
+  productIds: number[]; // Productos transportados (antes packageIds)
   orderIds: number[];
+  // Coordenadas para interpolación en el frontend
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
+  // Capacidad del vuelo
+  capacityUsed?: number;
+  capacityMax?: number;
+  cost?: number;
 }
 
 export class SimulationPlayer {
@@ -39,8 +48,24 @@ export class SimulationPlayer {
   private startRealTime: number = 0;
   private pausedAt: number = 0;
   private listeners: Set<(state: SimulationState) => void> = new Set();
+  private airportCoords: Map<string, {lat: number, lon: number}> = new Map();
 
-  constructor() {
+  constructor(airports?: Array<{codigoIATA: string, latitud: number, longitud: number}>) {
+    // Preprocesar aeropuertos para búsqueda O(1)
+    if (airports) {
+      airports.forEach(airport => {
+        // Asegurar que las coordenadas sean números (pueden venir como strings del backend)
+        const lat = typeof airport.latitud === 'number' ? airport.latitud : parseFloat(String(airport.latitud));
+        const lon = typeof airport.longitud === 'number' ? airport.longitud : parseFloat(String(airport.longitud));
+        
+        // Solo guardar si son válidos
+        if (!isNaN(lat) && !isNaN(lon) && isFinite(lat) && isFinite(lon)) {
+          this.airportCoords.set(airport.codigoIATA, { lat, lon });
+        } else {
+          console.warn(`⚠️ Aeropuerto ${airport.codigoIATA} tiene coordenadas inválidas: lat=${airport.latitud}, lon=${airport.longitud}`);
+        }
+      });
+    }
     this.state = {
       isPlaying: false,
       isPaused: false,
@@ -58,18 +83,36 @@ export class SimulationPlayer {
    */
   loadTimeline(timeline: LineaDeTiempoSimulacionDTO): void {
     this.timeline = timeline;
-    this.state.currentTime = new Date(timeline.horaInicio);
+    this.state.currentTime = new Date(timeline.horaInicioSimulacion);
     this.state.progress = 0;
     this.state.currentEventIndex = 0;
     this.state.activeFlights = [];
     this.state.completedEvents = [];
     
+    // Debug: Calcular duración para verificar
+    const startTime = new Date(timeline.horaInicioSimulacion).getTime();
+    const endTime = new Date(timeline.horaFinSimulacion).getTime();
+    const totalDuration = endTime - startTime;
+    const durationMinutes = totalDuration / 1000 / 60;
+    
     console.log('🎬 Timeline cargada:', {
-      eventos: timeline.eventos.length,
-      inicio: timeline.horaInicio,
-      fin: timeline.horaFin,
-      primerEvento: timeline.eventos[0],
+      eventos: timeline.eventos?.length || 0,
+      totalEventos: timeline.totalEventos,
+      inicio: timeline.horaInicioSimulacion,
+      fin: timeline.horaFinSimulacion,
+      duracionMinutos: durationMinutes,
+      duracionHoras: durationMinutes / 60,
+      primerEvento: timeline.eventos?.[0],
+      ultimoEvento: timeline.eventos?.[timeline.eventos?.length - 1],
     });
+    
+    if (totalDuration <= 0) {
+      console.error('❌ ERROR: Duración del timeline es 0 o negativa!', {
+        startTime,
+        endTime,
+        totalDuration,
+      });
+    }
     
     this.notifyListeners();
   }
@@ -93,9 +136,11 @@ export class SimulationPlayer {
     this.state.isPaused = false;
     this.startRealTime = Date.now() - (this.pausedAt || 0);
 
+    // Ajustar intervalo según velocidad (más rápido = menos actualizaciones para mejor performance)
+    const updateInterval = this.state.speedMultiplier > 1000 ? 50 : 100;
     this.intervalId = window.setInterval(() => {
       this.tick();
-    }, 100); // Actualizar cada 100ms
+    }, updateInterval);
 
     this.notifyListeners();
   }
@@ -123,7 +168,7 @@ export class SimulationPlayer {
    */
   stop(): void {
     this.pause();
-    this.state.currentTime = this.timeline ? new Date(this.timeline.horaInicio) : new Date();
+    this.state.currentTime = this.timeline ? new Date(this.timeline.horaInicioSimulacion) : new Date();
     this.state.progress = 0;
     this.state.currentEventIndex = 0;
     this.state.activeFlights = [];
@@ -136,10 +181,11 @@ export class SimulationPlayer {
    * Cambia la velocidad de reproducción
    */
   setSpeed(multiplier: number): void {
-    if (multiplier < 0.5 || multiplier > 10) {
-      throw new Error('Speed multiplier must be between 0.5 and 10');
+    if (multiplier < 0.5 || multiplier > 100000) {
+      throw new Error('Speed multiplier must be between 0.5 and 100000');
     }
     this.state.speedMultiplier = multiplier;
+    console.log(`⚡ Velocidad cambiada a ${multiplier}x`);
     this.notifyListeners();
   }
 
@@ -149,8 +195,8 @@ export class SimulationPlayer {
   seekToProgress(progress: number): void {
     if (!this.timeline) return;
 
-    const startTime = new Date(this.timeline.horaInicio).getTime();
-    const endTime = new Date(this.timeline.horaFin).getTime();
+    const startTime = new Date(this.timeline.horaInicioSimulacion).getTime();
+    const endTime = new Date(this.timeline.horaFinSimulacion).getTime();
     const totalDuration = endTime - startTime;
     
     const newTime = startTime + (totalDuration * progress / 100);
@@ -168,8 +214,8 @@ export class SimulationPlayer {
   private tick(): void {
     if (!this.timeline) return;
 
-    const startTime = new Date(this.timeline.horaInicio).getTime();
-    const endTime = new Date(this.timeline.horaFin).getTime();
+    const startTime = new Date(this.timeline.horaInicioSimulacion).getTime();
+    const endTime = new Date(this.timeline.horaFinSimulacion).getTime();
     const totalDuration = endTime - startTime;
 
     // Calcular tiempo simulado (con multiplicador de velocidad)
@@ -204,10 +250,26 @@ export class SimulationPlayer {
    */
   private updateEventsAndFlights(): void {
     if (!this.timeline) return;
+    if (!this.timeline.eventos || this.timeline.eventos.length === 0) {
+      console.warn('⚠️ No hay eventos en el timeline');
+      return;
+    }
 
     const currentTimeMs = this.state.currentTime.getTime();
     const newActiveFlights: ActiveFlightState[] = [];
     const newCompletedEvents: EventoLineaDeTiempoVueloDTO[] = [];
+
+    // Debug: Log del primer evento para verificar formato
+    if (this.state.completedEvents.length === 0) {
+      const primerEvento = this.timeline.eventos[0];
+      console.log('🔍 Debug primer evento:', {
+        horaEvento: primerEvento.horaEvento,
+        horaEventoParsed: new Date(primerEvento.horaEvento),
+        horaEventoMs: new Date(primerEvento.horaEvento).getTime(),
+        currentTimeMs,
+        diferencia: new Date(primerEvento.horaEvento).getTime() - currentTimeMs,
+      });
+    }
 
     // Procesar eventos hasta el tiempo actual
     for (const evento of this.timeline.eventos) {
@@ -238,6 +300,10 @@ export class SimulationPlayer {
               const elapsed = currentTimeMs - departureTime;
               const progress = elapsed / flightDuration;
 
+              // Obtener coordenadas de aeropuertos
+              const originCoords = this.airportCoords.get(evento.ciudadOrigen || '');
+              const destCoords = this.airportCoords.get(evento.ciudadDestino || '');
+              
               newActiveFlights.push({
                 eventId: evento.idEvento,
                 flightId: evento.idVuelo,
@@ -247,8 +313,13 @@ export class SimulationPlayer {
                 departureTime: new Date(departureTime),
                 arrivalTime: new Date(arrivalTime),
                 currentProgress: Math.min(progress, 1),
-                packageIds: evento.idProducto ? [evento.idProducto] : [],
+                productIds: evento.idProducto ? [evento.idProducto] : [], // Cambiado de packageIds
                 orderIds: evento.idPedido ? [evento.idPedido] : [],
+                // Agregar coordenadas para interpolación
+                originLat: originCoords?.lat,
+                originLon: originCoords?.lon,
+                destLat: destCoords?.lat,
+                destLon: destCoords?.lon,
               });
             }
           }

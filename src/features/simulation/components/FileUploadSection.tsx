@@ -128,10 +128,12 @@ function FileInputCard({
 }
 
 interface FileUploadSectionProps {
-  onValidationSuccess: (sessionId: string) => void;
+  onValidationSuccess: (sessionId: string) => void | Promise<void>;
+  horaInicio?: string;
+  horaFin?: string;
 }
 
-export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProps) {
+export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin }: FileUploadSectionProps) {
   const {
     filesState,
     clientErrors,
@@ -144,9 +146,10 @@ export function FileUploadSection({ onValidationSuccess }: FileUploadSectionProp
   } = useFileUpload();
   
   const handleValidate = async () => {
-    const result = await validateFiles();
+    const result = await validateFiles(horaInicio, horaFin);
     if (result?.success && result.sessionId) {
-      onValidationSuccess(result.sessionId);
+      // Llamar onValidationSuccess y esperar si es async
+      await onValidationSuccess(result.sessionId);
     }
   };
   

@@ -53,9 +53,13 @@ export interface EventoLineaDeTiempoVueloDTO {
 
 export interface LineaDeTiempoSimulacionDTO {
   eventos: EventoLineaDeTiempoVueloDTO[];
-  horaInicio: string;
-  horaFin: string;
+  horaInicioSimulacion: string; // ✅ Corregido para coincidir con backend
+  horaFinSimulacion: string;     // ✅ Corregido para coincidir con backend
   totalEventos: number;
+  duracionTotalMinutos?: number;
+  totalProductos?: number;
+  totalVuelos?: number;
+  totalAeropuertos?: number;
 }
 
 export interface ResultadoAlgoritmoDTO {

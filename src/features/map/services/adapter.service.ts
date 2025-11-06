@@ -10,7 +10,7 @@ import type {Aeropuerto, Vuelo, EstadoVuelo} from "@/types/map.types.ts";
  */
 export interface AeropuertoAPI {
     id: number;
-    codigo: string;
+    codigoIATA: string;
     capMaxAlmacen: number;
     cantActual: number;
     pais: string;

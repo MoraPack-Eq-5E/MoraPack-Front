@@ -13,3 +13,8 @@ export * from './OccupancyLegend';
 export * from './SimulationCompleteModal';
 export * from './SimulationControls';
 export * from './EventFeed';
+export * from './AnimatedFlightMarker';
+export * from './AnimatedFlightPath';
+export * from './RoutesLayer';
+export * from './FlightDetailsModal';
+export * from './AirportDetailsModal';

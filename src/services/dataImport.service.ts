@@ -84,15 +84,32 @@ export async function importFlights(file: File): Promise<ImportResult> {
  * 
  * Requiere que existan aeropuertos en BD
  * El archivo se procesa y guarda en BD inmediatamente
- * @param file Archivo pedidos.txt
+ * Opcionalmente filtra por ventana de tiempo
+ * 
+ * @param file Archivo pedidos.txt o _pedidos_{AIRPORT}_.txt
+ * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
+ * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
  * @returns Resultado de la importación con count de pedidos
  */
-export async function importOrders(file: File): Promise<ImportResult> {
+export async function importOrders(
+  file: File, 
+  horaInicio?: string, 
+  horaFin?: string
+): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
 
+  // Construir URL con parámetros opcionales
+  const url = new URL(`${API_URL}/api/data-import/orders`);
+  if (horaInicio) {
+    url.searchParams.append('horaInicio', horaInicio);
+  }
+  if (horaFin) {
+    url.searchParams.append('horaFin', horaFin);
+  }
+
   try {
-    const response = await fetch(`${API_URL}/api/data-import/orders`, {
+    const response = await fetch(url.toString(), {
       method: 'POST',
       body: formData,
     });

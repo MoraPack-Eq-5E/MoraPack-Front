@@ -71,8 +71,13 @@ export function useFileUpload() {
   
   /**
    * Valida e importa los archivos subidos secuencialmente a la BD
+   * @param horaInicio Opcional: filtrar pedidos desde esta hora (ISO 8601)
+   * @param horaFin Opcional: filtrar pedidos hasta esta hora (ISO 8601)
    */
-  const validateFiles = async (): Promise<FileUploadValidationResponse | null> => {
+  const validateFiles = async (
+    horaInicio?: string, 
+    horaFin?: string
+  ): Promise<FileUploadValidationResponse | null> => {
     setFilesState((prev) => ({ ...prev, isValidating: true }));
     setClientErrors([]);
     
@@ -100,13 +105,17 @@ export function useFileUpload() {
         totalCount += flightsResult.count || 0;
       }
       
-      // 3. Importar pedidos (requiere aeropuertos)
+      // 3. Importar pedidos (requiere aeropuertos) con filtrado opcional por tiempo
       if (filesState.pedidos?.file) {
-        const ordersResult = await importOrders(filesState.pedidos.file);
+        const ordersResult = await importOrders(filesState.pedidos.file, horaInicio, horaFin);
         if (!ordersResult.success) {
           throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
         }
-        results.push(`✓ Pedidos importados correctamente`);
+        let message = `✓ ${ordersResult.count} pedidos importados`;
+        if (horaInicio && horaFin) {
+          message += ` (filtrados por ventana de tiempo)`;
+        }
+        results.push(message);
       }
       
       const response: FileUploadValidationResponse = {
