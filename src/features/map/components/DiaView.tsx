@@ -14,10 +14,10 @@ export function DiaView() {
 
     const handleAirportClick = (airport: Aeropuerto) => {
         // Si clickean el mismo aeropuerto, deseleccionar
-        if (selectedAirportCode === airport.codigo) {
+        if (selectedAirportCode === airport.codigoIATA) {
             setSelectedAirportCode(null);
         } else {
-            setSelectedAirportCode(airport.codigo);
+            setSelectedAirportCode(airport.codigoIATA);
         }
     };
 
@@ -43,7 +43,7 @@ export function DiaView() {
                         key={airport.id}
                         airport={airport}
                         onClick={handleAirportClick}
-                        isSelected={selectedAirportCode === airport.codigo}
+                        isSelected={selectedAirportCode === airport.codigoIATA}
                     />
                 ))}
             </MapCanvas>

@@ -1,5 +1,4 @@
 // src/features/map/components/PedidoPanel.tsx
-
 import React, { useState } from 'react';
 
 // Definir un Cliente hardcodeado para ser usado en todos los pedidos
@@ -58,15 +57,16 @@ const PedidoPanel: React.FC = () => {
             aeropuertoOrigenCodigo: aeropuertoOrigen,
             fechaPedido: obtenerFechaActual(),
             fechaLimiteEntrega: obtenerFechaEntrega(),
-            estado: 'PENDIENTE', // Estado fijo
+            estado: 'PENDIENTE',
             prioridad: parseFloat(prioridad),
             cantidadProductos: cantidad,
             productos: [], // Si no hay productos, enviamos un array vacío
             rutasIds: [] // Si no hay rutas, enviamos un array vacío
         };
 
-        console.log('Nuevo Pedido:', nuevoPedido);  // Para depurar el contenido del pedido antes de enviarlo
+        console.log('Nuevo Pedido:', nuevoPedido);
 
+        // Para depurar el contenido del pedido antes de enviarlo
         try {
             // Hacemos la solicitud al backend para crear el pedido
             const response = await fetch(`${API_BASE_URL}/pedidos`, {
