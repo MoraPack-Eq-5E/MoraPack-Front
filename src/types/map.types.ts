@@ -8,7 +8,7 @@ export type MapMode = 'live' | 'simulation';
 
 export interface Aeropuerto {
     id: number;
-    codigo: string;
+    codigoIATA: string;
     capMaxAlmacen: number;
     cantActual: number;
     pais: string;

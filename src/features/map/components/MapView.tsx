@@ -1,128 +1,137 @@
 /**
  * MapView Component
  * 
- * Visualización en tiempo real de vuelos desde el backend
- * 
- * @param simulationId - ID de la simulación activa en el backend
+ * MEJORAS:
+ * - Canvas Renderer para mejor performance
+ * - RoutesLayer con viewport culling
+ * - Limitación de vuelos renderizados (MAX_FLIGHTS_RENDERED)
+ * - Curvas Bezier realistas
+ * - Throttling de actualizaciones
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { MapCanvas, FlightMarker, FlightRoute, AirportMarker, StatsCard, LoadingOverlay, OccupancyLegend, SimulationCompleteModal, SimulationControls, EventFeed } from '@/features/map/components';
-import { useLiveFlights, useMapStats, useAirportsForMap, useSimulationEvents } from '@/features/map/hooks';
-import type { Vuelo, Aeropuerto } from '@/types/map.types';
+import React, { useState, useEffect, useMemo } from 'react';
+import L from 'leaflet';
+import { useAirportsForMap } from '@/features/map/hooks';
+import type { SimulationPlayer, ActiveFlightState } from '@/services/simulation-player.service';
+import type { ResultadoAlgoritmoDTO } from '@/services/algoritmo.service';
+import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
+import type { Aeropuerto } from '@/types/map.types';
+import { MapCanvas } from './MapCanvas';
+import { AirportMarker } from './AirportMarker';
+import { AnimatedFlightMarker } from './AnimatedFlightMarker';
+import { RoutesLayer } from './RoutesLayer';
+import { FlightDetailsModal } from './FlightDetailsModal';
+import { AirportDetailsModal } from './AirportDetailsModal';
 
 interface MapViewProps {
-  simulationId: number | null;
+  player: SimulationPlayer;
+  resultado: ResultadoAlgoritmoDTO | AlgoritmoResponse;
 }
 
-const POLLING_INTERVAL = 2000; // 2 segundos
+// Constantes de optimización
+const MAX_FLIGHTS_RENDERED = 120; // Límite de vuelos simultáneos
+const CURVATURE = 0.25; // Factor de curvatura para las rutas
 
-export function MapView({ simulationId }: MapViewProps) {
+/**
+ * Valida que una coordenada sea un número válido
+ */
+function isValidCoordinate(coord: number | undefined | null): coord is number {
+  return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
+}
+
+export function MapView({ player, resultado }: MapViewProps) {
   const { airports, isLoading: airportsLoading } = useAirportsForMap();
-  const { flights, status, loadingStatus, error } = useLiveFlights(simulationId, POLLING_INTERVAL);
-  const stats = useMapStats(flights);
+  const [simulationState, setSimulationState] = useState(player.getState());
   
-  // Hook para gestionar eventos de simulación
-  const { filteredEvents } = useSimulationEvents(status?.recentEvents, {
-    maxEvents: 50,
-    autoScroll: true,
-    enableFilters: false,
-  });
-  
-  // Estado para el vuelo seleccionado (para mostrar su ruta)
-  const [selectedFlight, setSelectedFlight] = useState<Vuelo | null>(null);
-  
-  // Estado para el aeropuerto seleccionado (código IATA para buscar en warehouses)
-  const [selectedAirportCode, setSelectedAirportCode] = useState<string | null>(null);
-  
-  // Estado para el modal de simulación completada
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [completedSimulationData, setCompletedSimulationData] = useState<any>(null);
-  
-  // Ref para asegurar que solo capturamos los datos una vez cuando se completa
-  const hasCompletedRef = useRef(false);
-  
-  // Detectar cuando la simulación termina y capturar datos solo UNA VEZ
-  useEffect(() => {
-    if (status?.status === 'COMPLETED' && !hasCompletedRef.current) {
-      // Capturar datos en el momento exacto que se completa
-      hasCompletedRef.current = true;
-      setCompletedSimulationData(status);
-      setShowCompleteModal(true);
-    }
-  }, [status?.status]);
-  
-  // Resetear el ref cuando cambia la simulación
-  useEffect(() => {
-    hasCompletedRef.current = false;
-    setShowCompleteModal(false);
-    setCompletedSimulationData(null);
-  }, [simulationId]);
-  
-  const handleFlightClick = (vuelo: Vuelo) => {
-    // Deseleccionar aeropuerto si estaba seleccionado
-    setSelectedAirportCode(null);
-    
-    // Si clickean el mismo vuelo, deseleccionar
-    if (selectedFlight?.id === vuelo.id) {
-      setSelectedFlight(null);
-    } else {
-      setSelectedFlight(vuelo);
-    }
-  };
-  
-  const handleAirportClick = (airport: Aeropuerto) => {
-    // Deseleccionar vuelo si estaba seleccionado
-    setSelectedFlight(null);
-    
-    // Si clickean el mismo aeropuerto, deseleccionar
-    if (selectedAirportCode === airport.codigo) {
-      setSelectedAirportCode(null);
-    } else {
-      setSelectedAirportCode(airport.codigo);
-    }
-  };
-  
-  // Obtener datos del aeropuerto seleccionado desde warehouses (datos en tiempo real)
-  const selectedAirportWarehouse = useMemo(() => {
-    if (!selectedAirportCode || !status?.warehouses) return null;
-    return status.warehouses.find(w => w.code === selectedAirportCode);
-  }, [selectedAirportCode, status?.warehouses]);
-  
-  // Obtener información completa del aeropuerto (combinar datos estáticos con datos en tiempo real)
-  const selectedAirportFull = useMemo(() => {
-    if (!selectedAirportCode) return null;
-    
-    // Buscar en lista estática para datos básicos
-    const staticAirport = airports.find(a => a.codigo === selectedAirportCode);
-    if (!staticAirport) return null;
-    
-    // Combinar con datos en tiempo real si están disponibles
-    const warehouse = selectedAirportWarehouse;
-    if (warehouse) {
-      return {
-        ...staticAirport,
-        cantActual: warehouse.current, // Usar datos actualizados de la simulación
-        capMaxAlmacen: warehouse.capacity,
-        isPrincipal: warehouse.isPrincipal,
-      };
-    }
-    
-    return staticAirport;
-  }, [selectedAirportCode, airports, selectedAirportWarehouse]);
-  
-  // Filtrar vuelos que salen o llegan al aeropuerto seleccionado
-  const airportFlights = useMemo(() => {
-    if (!selectedAirportCode) return [];
-    
-    return flights.filter(
-      (flight) =>
-        flight.codigoOrigen === selectedAirportCode ||
-        flight.codigoDestino === selectedAirportCode
-    );
-  }, [selectedAirportCode, flights]);
+  // Estados para modales interactivos
+  const [selectedAirport, setSelectedAirport] = useState<Aeropuerto | null>(null);
+  const [selectedFlight, setSelectedFlight] = useState<ActiveFlightState | null>(null);
 
-  // Cargando aeropuertos
+  // Canvas Renderer para mejor performance con muchas polylines
+  const canvasRenderer = useMemo(() => L.canvas(), []);
+
+  // Validar aeropuertos y reportar los que tengan problemas
+  React.useEffect(() => {
+    const invalidAirports = airports.filter(
+      airport => !isValidCoordinate(airport.latitud) || !isValidCoordinate(airport.longitud)
+    );
+    
+    if (invalidAirports.length > 0) {
+      console.warn(`⚠️ Se encontraron ${invalidAirports.length} aeropuertos con coordenadas inválidas:`, 
+        invalidAirports.map(a => ({
+          codigoIATA: a.codigoIATA,
+          latitud: a.latitud,
+          longitud: a.longitud,
+        }))
+      );
+    }
+  }, [airports]);
+
+  // Suscribirse a cambios del player
+  useEffect(() => {
+    console.log('📡 Suscribiendo al player...');
+    const unsubscribe = player.subscribe((newState) => {
+      console.log('📊 Estado actualizado:', {
+        isPlaying: newState.isPlaying,
+        progress: newState.progress.toFixed(1),
+        eventos: newState.completedEvents.length,
+        vuelos: newState.activeFlights.length
+      });
+      setSimulationState(newState);
+    });
+    
+    return () => {
+      console.log('📴 Desuscribiendo del player');
+      unsubscribe();
+    };
+  }, [player]);
+
+  // Limitar número de vuelos renderizados para mejor performance
+  // Priorizar vuelos con más progreso (más visibles)
+  const culledFlights = useMemo(() => {
+    const flights = simulationState.activeFlights;
+    
+    if (flights.length <= MAX_FLIGHTS_RENDERED) {
+      return flights;
+    }
+    
+    // Ordenar por progreso descendente y tomar los primeros MAX_FLIGHTS_RENDERED
+    return [...flights]
+      .sort((a, b) => b.currentProgress - a.currentProgress)
+      .slice(0, MAX_FLIGHTS_RENDERED);
+  }, [simulationState.activeFlights]);
+
+  // Controles del player
+  const handlePlay = () => {
+    console.log('🎮 Botón PLAY presionado');
+    player.play();
+  };
+
+  const handlePause = () => {
+    console.log('🎮 Botón PAUSE presionado');
+    player.pause();
+  };
+
+  const handleStop = () => {
+    console.log('🎮 Botón STOP presionado');
+    player.stop();
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    player.setSpeed(speed);
+  };
+
+  // Handlers para interactividad
+  const handleAirportClick = (airport: Aeropuerto) => {
+    console.log('🏢 Aeropuerto clickeado:', airport.codigoIATA);
+    setSelectedAirport(airport);
+  };
+
+  const handleFlightClick = (flight: ActiveFlightState) => {
+    console.log('✈️ Vuelo clickeado:', flight.flightCode);
+    setSelectedFlight(flight);
+  };
+
   if (airportsLoading) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-50">
@@ -134,209 +143,166 @@ export function MapView({ simulationId }: MapViewProps) {
     );
   }
 
-  // Sin simulación activa
-  if (!simulationId) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
-            No hay simulación activa
-          </h2>
-          <p className="text-gray-500">
-            Inicia una simulación para ver vuelos en tiempo real
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error de conexión
-  if (error) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-red-50">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-700 mb-2">
-            Error de conexión
-          </h2>
-          <p className="text-red-600">
-            {error.message}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full w-full relative">
-      {/* Loading Overlay - Muestra el progreso de carga */}
-      <LoadingOverlay
-        status={loadingStatus}
-        message={
-          loadingStatus === 'loading-visualization'
-            ? 'Esto puede tomar unos segundos...'
-            : undefined
-        }
-      />
-
+    <div className="h-full w-full relative bg-gray-50">
+      {/* Mapa */}
       <MapCanvas className="h-full w-full">
-        {/* Aeropuertos - usar warehouses de la simulación si están disponibles para datos actualizados */}
-        {(status?.warehouses && status.warehouses.length > 0 
-          ? status.warehouses.map((warehouse) => {
-              // Buscar aeropuerto estático para datos básicos
-              const staticAirport = airports.find(a => a.codigo === warehouse.code);
-              if (!staticAirport) return null;
-              
-              // Combinar datos estáticos con datos en tiempo real
-              const airportWithRealTime: Aeropuerto = {
-                ...staticAirport,
-                cantActual: warehouse.current, // Datos actualizados de la simulación
-                capMaxAlmacen: warehouse.capacity,
-                isPrincipal: warehouse.isPrincipal,
-              };
-              
-              return (
-                <AirportMarker 
-                  key={warehouse.warehouseId} 
-                  airport={airportWithRealTime}
-                  onClick={handleAirportClick}
-                  isSelected={selectedAirportCode === warehouse.code}
-                />
-              );
-            })
-          : airports.map((airport) => (
-              <AirportMarker 
-                key={airport.id} 
-                airport={airport}
-                onClick={handleAirportClick}
-                isSelected={selectedAirportCode === airport.codigo}
-              />
-            ))
-        ).filter(Boolean)}
+        {/* Renderizar todos los aeropuertos (solo los que tengan coordenadas válidas) */}
+        {airports
+          .filter(airport => 
+            isValidCoordinate(airport.latitud) && 
+            isValidCoordinate(airport.longitud)
+          )
+          .map((airport) => (
+            <AirportMarker 
+              key={airport.id} 
+              airport={airport}
+              onClick={() => handleAirportClick(airport)}
+            />
+          ))}
         
-        {/* Línea de ruta del vuelo seleccionado */}
-        {selectedFlight && (
-          <FlightRoute vuelo={selectedFlight} />
+        {/* Rutas de vuelo optimizadas con viewport culling */}
+        {culledFlights.length > 0 && (
+          <RoutesLayer 
+            flights={culledFlights}
+            airports={airports}
+            canvasRenderer={canvasRenderer}
+            curvature={CURVATURE}
+          />
         )}
         
-        {/* Líneas de rutas del aeropuerto seleccionado */}
-        {selectedAirportCode && airportFlights.map((flight) => (
-          <FlightRoute key={flight.id} vuelo={flight} />
-        ))}
-        
-        {/* Vuelos en tiempo real */}
-        {flights.map((flight) => (
-          <FlightMarker 
-            key={flight.id} 
-            vuelo={flight}
-            onClick={handleFlightClick}
-          />
-        ))}
-        
-        {/* Stats card con datos reales */}
-        <StatsCard
-          flightsInAir={stats.total}
-          slaPct={status?.metrics.slaCompliancePercentage || 0}
-          warehousePct={status?.metrics.averageWarehouseOccupancy || 0}
-          now={status?.currentSimulatedTime || new Date().toISOString()}
-        />
-      </MapCanvas>
-      
-      {/* Panel derecho: Controles + Eventos + Tracking */}
-      {loadingStatus === 'ready' && simulationId && status && (
-        <div className="absolute top-4 right-4 z-[1000] w-[340px] flex flex-col gap-4">
-          {/* Controles de simulación */}
-          <SimulationControls
-            simulationId={simulationId}
-            currentStatus={status.status}
-            currentSpeed={status.timeScale || 112}
-            onStatusChange={() => {
-              // El hook useLiveFlights ya hace polling automático
-              // No necesitamos hacer nada extra aquí
-            }}
-          />
+        {/* Marcadores de aviones animados */}
+        {culledFlights.map((flight) => {
+          // Validar coordenadas antes de renderizar
+          if (!isValidCoordinate(flight.originLat) || 
+              !isValidCoordinate(flight.originLon) || 
+              !isValidCoordinate(flight.destLat) || 
+              !isValidCoordinate(flight.destLon)) {
+            return null;
+          }
           
-          {/* Feed de eventos en tiempo real */}
-          <EventFeed
-            events={filteredEvents}
-            maxHeight="400px"
-            enableSearch={false}
-          />
+          return (
+            <AnimatedFlightMarker 
+              key={flight.eventId} 
+              flight={flight}
+              curvature={CURVATURE}
+              onClick={() => handleFlightClick(flight)}
+            />
+          );
+        })}
+      </MapCanvas>
+
+      {/* Panel de información */}
+      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-sm z-[1000]">
+        <h3 className="font-semibold text-gray-900 mb-2">Estado de la Simulación</h3>
+        <div className="space-y-2 text-sm">
+          <p><span className="font-medium">Progreso:</span> {simulationState.progress.toFixed(1)}%</p>
+          <p><span className="font-medium">Vuelos activos:</span> {simulationState.activeFlights.length}</p>
+          <p><span className="font-medium">Vuelos renderizados:</span> {culledFlights.length}</p>
+          <p><span className="font-medium">Eventos completados:</span> {simulationState.completedEvents.length}</p>
+          <p><span className="font-medium">Velocidad:</span> {simulationState.speedMultiplier}x</p>
         </div>
-      )}
-      
-      {/* Leyenda de colores de ocupación */}
-      {loadingStatus === 'ready' && <OccupancyLegend />}
-      
-      {/* Indicador de vuelo seleccionado */}
-      {selectedFlight && loadingStatus === 'ready' && (
-        <div className="absolute bottom-24 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200 z-[1000]">
-          <div className="text-sm font-medium text-gray-700">
-            Ruta: {selectedFlight.codigo}
+        
+        <div className="mt-3 pt-3 border-t">
+          <p className="text-xs text-gray-500 mb-2">Resultado del algoritmo:</p>
+          <p className="text-sm"><span className="font-medium">Productos:</span> {resultado.totalProductos}</p>
+          <p className="text-sm"><span className="font-medium">Costo total:</span> ${resultado.costoTotal?.toFixed(2) || 0}</p>
+        </div>
+        
+        {simulationState.activeFlights.length > MAX_FLIGHTS_RENDERED && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            ⚠️ Mostrando {MAX_FLIGHTS_RENDERED} de {simulationState.activeFlights.length} vuelos para mejor performance
           </div>
-          <div className="text-xs text-gray-500">
-            {selectedFlight.ciudadOrigen} → {selectedFlight.ciudadDestino}
-          </div>
+        )}
+      </div>
+
+      {/* Controles de reproducción */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-4 z-[1000]">
+        <div className="flex items-center gap-4">
+          {!simulationState.isPlaying ? (
+            <button
+              onClick={handlePlay}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+            >
+              ▶ Play
+            </button>
+          ) : (
+            <button
+              onClick={handlePause}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium"
+            >
+              ⏸ Pause
+            </button>
+          )}
+          
           <button
-            onClick={() => setSelectedFlight(null)}
-            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+            onClick={handleStop}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
           >
-            Ocultar ruta
+            ⏹ Stop
           </button>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Velocidad:</label>
+            <select
+              value={simulationState.speedMultiplier}
+              onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded"
+            >
+              <option value="10">10x</option>
+              <option value="50">50x</option>
+              <option value="100">100x</option>
+              <option value="200">200x</option>
+              <option value="500">500x ⚡</option>
+              <option value="1000">1000x 🚀</option>
+              <option value="5000">5000x 💨</option>
+              <option value="10000">10000x ⚡⚡⚡</option>
+            </select>
+          </div>
         </div>
-      )}
-      
-      {/* Indicador de aeropuerto seleccionado */}
-      {selectedAirportFull && loadingStatus === 'ready' && (
-        <div className="absolute bottom-24 left-4 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200 z-[1000]">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="text-lg font-bold text-gray-900">
-              {selectedAirportFull.codigo}
-            </div>
-            {selectedAirportFull.isPrincipal && (
-              <div className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                Sede MoraPack
-              </div>
-            )}
-            <div className={`px-2 py-0.5 rounded text-xs font-medium ${
-              selectedAirportFull.estado === 'DISPONIBLE' 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-gray-100 text-gray-600'
-            }`}>
-              {selectedAirportFull.estado === 'DISPONIBLE' ? 'Activo' : 'Inactivo'}
-            </div>
+
+        {/* Barra de progreso */}
+        <div className="mt-3">
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all"
+              style={{ width: `${simulationState.progress}%` }}
+            />
           </div>
-          <div className="text-xs text-gray-600 mb-1">
-            {selectedAirportFull.pais}
-          </div>
-          <div className="text-sm font-medium text-blue-600 mb-2">
-            {airportFlights.length} vuelos conectados
-          </div>
-          <div className="text-xs text-gray-500 mb-2">
-            Ocupación: {selectedAirportFull.cantActual}/{selectedAirportFull.capMaxAlmacen} paquetes
-            {selectedAirportWarehouse && (
-              <span className="ml-2 text-amber-600 font-medium">
-                ({Math.round(selectedAirportWarehouse.occupancyPercentage)}%)
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => setSelectedAirportCode(null)}
-            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
-          >
-            Ocultar rutas
-          </button>
         </div>
-      )}
-      
-      {/* Modal de simulación completada */}
-      {completedSimulationData && (
-        <SimulationCompleteModal
-          isOpen={showCompleteModal}
-          onClose={() => setShowCompleteModal(false)}
-          simulationData={completedSimulationData}
-        />
-      )}
+      </div>
+
+      {/* Lista de eventos recientes */}
+      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-md max-h-96 overflow-y-auto z-[1000]">
+        <h3 className="font-semibold text-gray-900 mb-2">Eventos Recientes</h3>
+        <div className="space-y-2">
+          {simulationState.completedEvents.slice(-10).reverse().map((evento, idx) => (
+            <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+              <p className="font-medium">{evento.codigoVuelo}</p>
+              <p className="text-gray-600">{evento.ciudadOrigen} → {evento.ciudadDestino}</p>
+              <p className="text-gray-500">{evento.tipoEvento}</p>
+            </div>
+          ))}
+          {simulationState.completedEvents.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No hay eventos aún. Presiona Play para iniciar.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Modales interactivos */}
+      <FlightDetailsModal
+        flight={selectedFlight}
+        origin={selectedFlight ? airports.find(a => a.codigoIATA === selectedFlight.originCode) || null : null}
+        destination={selectedFlight ? airports.find(a => a.codigoIATA === selectedFlight.destinationCode) || null : null}
+        onClose={() => setSelectedFlight(null)}
+      />
+
+      <AirportDetailsModal
+        airport={selectedAirport}
+        onClose={() => setSelectedAirport(null)}
+      />
     </div>
   );
 }
-
