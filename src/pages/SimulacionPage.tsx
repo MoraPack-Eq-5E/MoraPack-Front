@@ -33,7 +33,7 @@ export function SimulacionPage() {
   const [error, setError] = useState<string | null>(null);
   
   // Hook para obtener aeropuertos
-  const { isLoading: airportsLoading } = useAirportsForMap();
+  const { airports, isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
   
   // Configuración del algoritmo semanal (simplificada)
   const [config, setConfig] = useState<AlgoritmoRequest>({
@@ -57,6 +57,9 @@ export function SimulacionPage() {
       // Solo necesitamos consultar el estado
       console.log('✅ Archivos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
       console.log('📊 Consultando estado de base de datos...');
+      
+      // IMPORTANTE: Refetch de aeropuertos después de importar
+      await refetchAirports();
       
       // Obtener estado de datos desde BD
       const estado = await obtenerEstadoDatos();
@@ -95,6 +98,10 @@ export function SimulacionPage() {
     
     try {
       console.log('📥 Cargando pedidos desde directorio del servidor...');
+      
+      // IMPORTANTE: Refetch de aeropuertos por si fueron cargados en el servidor
+      await refetchAirports();
+      
       const resultado = await cargarPedidos({
         horaInicio: config.horaInicioSimulacion,
         horaFin: calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!),
