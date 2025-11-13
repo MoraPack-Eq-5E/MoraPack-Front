@@ -88,7 +88,7 @@ export interface UploadFilesState {
   vuelos?: UploadedFile;
   
   /** Archivo de pedidos */
-  pedidos?: UploadedFile;
+  pedidos?: UploadedFile[];
 
   /** Archivo de cancelaciones */
   cancelaciones?: UploadedFile;

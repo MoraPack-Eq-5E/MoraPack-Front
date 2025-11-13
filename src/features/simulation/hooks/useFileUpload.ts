@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { importAirports, importFlights, importOrders, importCancellations } from '@/services/dataImport.service';
+import { importAirports, importFlights, importOrders, importCancellations, importOrdersBatch } from '@/services/dataImport.service';
 import { validateFileSize, validateFileType } from '@/services/fileUpload.service';
+import { SimulationFileType } from '@/types/fileUpload.types';
 import type {
   UploadFilesState,
   UploadedFile,
-  SimulationFileType,
   FileUploadValidationResponse,
 } from '@/types/fileUpload.types';
 
@@ -19,16 +19,20 @@ export function useFileUpload() {
   const [clientErrors, setClientErrors] = useState<string[]>([]);
   
   /**
-   * Añade un archivo
+   * Añade un archivo (o múltiples si es PEDIDOS)
    */
-  const addFile = (file: File, type: SimulationFileType) => {
-    // Validar en el cliente
-    const sizeValidation = validateFileSize(file);
-    const typeValidation = validateFileType(file);
+  const addFile = (file: File | File[], type: SimulationFileType) => {
+    const files = Array.isArray(file) ? file : [file];
     
+    // Validar todos los archivos en el cliente
     const errors: string[] = [];
-    if (!sizeValidation.valid) errors.push(sizeValidation.error!);
-    if (!typeValidation.valid) errors.push(typeValidation.error!);
+    files.forEach((f) => {
+      const sizeValidation = validateFileSize(f);
+      const typeValidation = validateFileType(f);
+      
+      if (!sizeValidation.valid) errors.push(`${f.name}: ${sizeValidation.error}`);
+      if (!typeValidation.valid) errors.push(`${f.name}: ${typeValidation.error}`);
+    });
     
     if (errors.length > 0) {
       setClientErrors(errors);
@@ -38,18 +42,35 @@ export function useFileUpload() {
     // Limpiar errores previos
     setClientErrors([]);
     
-    const uploadedFile: UploadedFile = {
-      file,
-      type,
-    };
-    
-    setFilesState((prev) => ({
-      ...prev,
-      [type.toLowerCase()]: uploadedFile,
-      // Limpiar validación previa
-      validationResponse: undefined,
-      sessionId: undefined,
-    }));
+    if (type === SimulationFileType.PEDIDOS) {
+      // Para pedidos, mantener array
+      const uploadedFiles: UploadedFile[] = files.map(f => ({
+        file: f,
+        type,
+      }));
+      
+      setFilesState((prev) => ({
+        ...prev,
+        pedidos: [...(prev.pedidos || []), ...uploadedFiles],
+        // Limpiar validación previa
+        validationResponse: undefined,
+        sessionId: undefined,
+      }));
+    } else {
+      // Para aeropuertos y vuelos, mantener archivo único
+      const uploadedFile: UploadedFile = {
+        file: files[0],
+        type,
+      };
+      
+      setFilesState((prev) => ({
+        ...prev,
+        [type.toLowerCase()]: uploadedFile,
+        // Limpiar validación previa
+        validationResponse: undefined,
+        sessionId: undefined,
+      }));
+    }
   };
   
   /**
@@ -60,10 +81,31 @@ export function useFileUpload() {
       const newState = { ...prev };
       delete newState[type.toLowerCase() as keyof UploadFilesState];
       // Limpiar validación si se eliminan todos los archivos
-      if (!newState.aeropuertos && !newState.vuelos && !newState.pedidos && !newState.cancelaciones) {
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0) && !newState.cancelaciones) {
+        newState.validationResponse = undefined;
+        newState.sessionId = undefined;
+      } 
+      return newState;
+    });
+    setClientErrors([]);
+  };
+  
+  /**
+   * Elimina un archivo de pedidos por índice
+   */
+  const removeFileByIndex = (index: number) => {
+    setFilesState((prev) => {
+      const newPedidos = [...(prev.pedidos || [])];
+      newPedidos.splice(index, 1);
+      
+      const newState = { ...prev, pedidos: newPedidos.length > 0 ? newPedidos : undefined };
+      
+      // Limpiar validación si se eliminan todos los archivos
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)) {
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
       }
+      
       return newState;
     });
     setClientErrors([]);
@@ -106,16 +148,43 @@ export function useFileUpload() {
       }
       
       // 3. Importar pedidos (requiere aeropuertos) con filtrado opcional por tiempo
-      if (filesState.pedidos?.file) {
-        const ordersResult = await importOrders(filesState.pedidos.file, horaInicio, horaFin);
-        if (!ordersResult.success) {
-          throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
+      if (filesState.pedidos && filesState.pedidos.length > 0) {
+        const pedidosFiles = filesState.pedidos.map(p => p.file);
+        
+        if (pedidosFiles.length === 1) {
+          // Un solo archivo: usar importación simple
+          const ordersResult = await importOrders(pedidosFiles[0], horaInicio, horaFin);
+          if (!ordersResult.success) {
+            throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
+          }
+          let message = `✓ ${ordersResult.count} pedidos importados`;
+          if (horaInicio && horaFin) {
+            message += ` (filtrados por ventana de tiempo)`;
+          }
+          results.push(message);
+        } else {
+          // Múltiples archivos: usar importación batch
+          const batchResult = await importOrdersBatch(pedidosFiles, horaInicio, horaFin);
+          if (!batchResult.success) {
+            throw new Error(`Error al importar pedidos en batch: ${batchResult.message}`);
+          }
+          let message = `✓ ${batchResult.totalOrders} pedidos importados de ${batchResult.filesProcessed}/${batchResult.totalFiles} archivos`;
+          if (horaInicio && horaFin) {
+            message += ` (filtrados por ventana de tiempo)`;
+          }
+          results.push(message);
+          
+          // Añadir detalles por archivo
+          if (batchResult.fileResults) {
+            batchResult.fileResults.forEach((fileResult) => {
+              if (fileResult.success) {
+                results.push(`  - ${fileResult.filename}: ${fileResult.orders} pedidos`);
+              } else {
+                results.push(`  - ${fileResult.filename}: ERROR - ${fileResult.error}`);
+              }
+            });
+          }
         }
-        let message = `✓ ${ordersResult.count} pedidos importados`;
-        if (horaInicio && horaFin) {
-          message += ` (filtrados por ventana de tiempo)`;
-        }
-        results.push(message);
       }
 
       // 4. Importar cancelaciones (opcional)
@@ -167,7 +236,7 @@ export function useFileUpload() {
    * Verifica si hay archivos cargados
    */
   const hasFiles = Boolean(
-    filesState.aeropuertos || filesState.vuelos || filesState.pedidos || filesState.cancelaciones
+    filesState.aeropuertos || filesState.vuelos || (filesState.pedidos && filesState.pedidos.length > 0 || filesState.cancelaciones)
   );
   
   /**
@@ -187,6 +256,7 @@ export function useFileUpload() {
     // Acciones
     addFile,
     removeFile,
+    removeFileByIndex,
     validateFiles,
     clearAll,
   };
