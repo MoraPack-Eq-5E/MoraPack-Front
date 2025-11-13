@@ -156,6 +156,7 @@ export interface BatchImportResult {
  * Cada archivo se procesa con su propio aeropuerto de origen
  * 
  * @param files Array de archivos de pedidos (_pedidos_{AIRPORT}_.txt)
+ * @param modo Modo de simulación: SEMANAL o COLAPSO
  * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
  * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
  * @returns Resultado detallado del batch import con información por archivo
@@ -181,6 +182,9 @@ export async function importOrdersBatch(
   }
   if (horaFin) {
     url.searchParams.append('horaFin', horaFin);
+  }
+  if (modo) {
+    url.searchParams.append('modo', modo);
   }
 
   try {
