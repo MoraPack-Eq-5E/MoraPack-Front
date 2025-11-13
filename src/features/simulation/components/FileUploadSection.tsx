@@ -7,16 +7,22 @@ interface FileInputCardProps {
   title: string;
   description: string;
   file?: File;
-  onFileSelect: (file: File) => void;
+  files?: File[];  // Para soportar múltiples archivos (pedidos)
+  onFileSelect: (file: File | File[]) => void;
   onFileRemove: () => void;
+  onFileRemoveByIndex?: (index: number) => void;
+  acceptMultiple?: boolean;
 }
 
 function FileInputCard({
   title,
   description,
   file,
+  files,
   onFileSelect,
   onFileRemove,
+  onFileRemoveByIndex,
+  acceptMultiple = false,
 }: FileInputCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +58,12 @@ function FileInputCard({
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (selectedFiles && selectedFiles.length > 0) {
-      onFileSelect(selectedFiles[0]);
+      // Si hay múltiples archivos, pasar array; si no, un archivo solo
+      if (selectedFiles.length > 1) {
+        onFileSelect(Array.from(selectedFiles));
+      } else {
+        onFileSelect(selectedFiles[0]);
+      }
     }
   };
   
@@ -84,7 +95,45 @@ function FileInputCard({
           <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
           <p className="text-sm text-gray-600 mb-3">{description}</p>
           
-          {file ? (
+          {files && files.length > 0 ? (
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-700">
+                {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {files.map((f, index) => (
+                  <div key={index} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-green-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-xs font-medium text-gray-700 truncate" title={f.name}>
+                        {f.name}
+                      </span>
+                      <span className="text-xs text-gray-500 flex-shrink-0">
+                        ({(f.size / 1024 / 1024).toFixed(1)} MB)
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => onFileRemoveByIndex?.(index)}
+                      className="ml-2 text-red-600 hover:text-red-700 p-1 flex-shrink-0"
+                      title="Eliminar archivo"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={onFileRemove}
+                className="text-xs text-red-600 hover:text-red-700 underline"
+              >
+                Eliminar todos
+              </button>
+            </div>
+          ) : file ? (
             <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -110,7 +159,7 @@ function FileInputCard({
               onClick={handleClick}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              Seleccionar archivo .txt
+              Seleccionar archivo{acceptMultiple ? 's' : ''} .txt
             </button>
           )}
           
@@ -118,6 +167,7 @@ function FileInputCard({
             ref={fileInputRef}
             type="file"
             accept=".txt"
+            multiple={acceptMultiple}
             onChange={handleFileInputChange}
             className="hidden"
           />
@@ -141,6 +191,7 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin }: 
     isValidated,
     addFile,
     removeFile,
+    removeFileByIndex,
     validateFiles,
     clearAll,
   } = useFileUpload();
@@ -190,10 +241,12 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin }: 
         
         <FileInputCard
           title="Pedidos"
-          description="pedidos.txt"
-          file={filesState.pedidos?.file}
+          description="pedidos.txt (múltiples archivos permitidos)"
+          files={filesState.pedidos?.map(p => p.file)}
           onFileSelect={(file) => addFile(file, SimulationFileType.PEDIDOS)}
           onFileRemove={() => removeFile(SimulationFileType.PEDIDOS)}
+          onFileRemoveByIndex={removeFileByIndex}
+          acceptMultiple={true}
         />
       </div>
       

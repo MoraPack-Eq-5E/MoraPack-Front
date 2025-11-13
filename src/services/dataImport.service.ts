@@ -128,6 +128,81 @@ export async function importOrders(
 }
 
 /**
+ * Resultado detallado de batch import
+ */
+export interface FileImportResult {
+  filename: string;
+  success: boolean;
+  orders?: number;
+  error?: string;
+  loaded?: number;
+  filtered?: number;
+}
+
+export interface BatchImportResult {
+  success: boolean;
+  message: string;
+  totalOrders: number;
+  filesProcessed: number;
+  totalFiles: number;
+  filesWithErrors?: number;
+  fileResults: FileImportResult[];
+  errors?: string[];
+}
+
+/**
+ * Importa múltiples archivos de pedidos en batch
+ * POST /api/data-import/orders/batch
+ * 
+ * Requiere que existan aeropuertos en BD
+ * Cada archivo se procesa con su propio aeropuerto de origen
+ * 
+ * @param files Array de archivos de pedidos (_pedidos_{AIRPORT}_.txt)
+ * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
+ * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
+ * @returns Resultado detallado del batch import con información por archivo
+ */
+export async function importOrdersBatch(
+  files: File[], 
+  horaInicio?: string, 
+  horaFin?: string
+): Promise<BatchImportResult> {
+  const formData = new FormData();
+  
+  // Añadir todos los archivos al FormData
+  files.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  // Construir URL con parámetros opcionales
+  const url = new URL(`${API_URL}/api/data-import/orders/batch`);
+  if (horaInicio) {
+    url.searchParams.append('horaInicio', horaInicio);
+  }
+  if (horaFin) {
+    url.searchParams.append('horaFin', horaFin);
+  }
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result: BatchImportResult = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'Error importando pedidos en batch');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error importando pedidos en batch:', error);
+    throw error;
+  }
+}
+
+/**
  * Obtiene el estado de los endpoints de importación
  * GET /api/data-import/status
  */

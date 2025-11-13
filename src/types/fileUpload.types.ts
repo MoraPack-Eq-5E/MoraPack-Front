@@ -84,8 +84,8 @@ export interface UploadFilesState {
   /** Archivo de vuelos */
   vuelos?: UploadedFile;
   
-  /** Archivo de pedidos */
-  pedidos?: UploadedFile;
+  /** Archivos de pedidos (soporta múltiples) */
+  pedidos?: UploadedFile[];
   
   /** ID de sesión después de validación exitosa */
   sessionId?: string;
