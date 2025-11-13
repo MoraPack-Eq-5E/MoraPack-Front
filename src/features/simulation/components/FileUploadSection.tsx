@@ -131,9 +131,11 @@ interface FileUploadSectionProps {
   onValidationSuccess: (sessionId: string) => void | Promise<void>;
   horaInicio?: string;
   horaFin?: string;
+  modoSimulacion: string;
 }
 
-export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin }: FileUploadSectionProps) {
+export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
+   modoSimulacion }: FileUploadSectionProps) {
   const {
     filesState,
     clientErrors,
@@ -146,7 +148,7 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin }: 
   } = useFileUpload();
   
   const handleValidate = async () => {
-    const result = await validateFiles(horaInicio, horaFin);
+    const result = await validateFiles(modoSimulacion,horaInicio, horaFin,);
     if (result?.success && result.sessionId) {
       // Llamar onValidationSuccess y esperar si es async
       await onValidationSuccess(result.sessionId);

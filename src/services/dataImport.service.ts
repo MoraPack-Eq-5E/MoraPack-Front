@@ -93,29 +93,26 @@ export async function importFlights(file: File): Promise<ImportResult> {
  */
 export async function importOrders(
   file: File, 
+  modo: string,
   horaInicio?: string, 
-  horaFin?: string
+  horaFin?: string,
 ): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
 
-  // Construir URL con parámetros opcionales
-  const url = new URL(`${API_URL}/api/data-import/orders`);
-  if (horaInicio) {
-    url.searchParams.append('horaInicio', horaInicio);
-  }
-  if (horaFin) {
-    url.searchParams.append('horaFin', horaFin);
-  }
+  // ⚙️ Todo va en el mismo cuerpo form-data
+  if (horaInicio) formData.append('horaInicio', horaInicio);
+  if (horaFin) formData.append('horaFin', horaFin);
+  if (modo) formData.append('modo', modo);
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetch(`${API_URL}/api/data-import/orders`, {
       method: 'POST',
       body: formData,
     });
 
     const result: ImportResult = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Error importando pedidos');
     }

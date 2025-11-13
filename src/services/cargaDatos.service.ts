@@ -9,6 +9,7 @@ export interface CargaDatosRequest {
   directorioArchivos?: string;
   horaInicio?: string; // ISO 8601 format
   horaFin?: string;
+  modo?: 'SEMANAL' | 'COLAPSO'; // 🔹 NUEVO
 }
 
 export interface CargaDatosResponse {
@@ -59,6 +60,9 @@ export async function cargarPedidos(
   }
   if (request?.horaFin) {
     params.append('horaFin', request.horaFin);
+  }
+  if (request?.modo) {                            // 🔹 NUEVO
+    params.append('modo', request.modo);          // 🔹 NUEVO
   }
 
   const url = `${API_BASE}/api/datos/cargar-pedidos${params.toString() ? '?' + params.toString() : ''}`;

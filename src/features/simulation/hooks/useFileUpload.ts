@@ -75,8 +75,9 @@ export function useFileUpload() {
    * @param horaFin Opcional: filtrar pedidos hasta esta hora (ISO 8601)
    */
   const validateFiles = async (
+    modoSimulacion: string,
     horaInicio?: string, 
-    horaFin?: string
+    horaFin?: string,
   ): Promise<FileUploadValidationResponse | null> => {
     setFilesState((prev) => ({ ...prev, isValidating: true }));
     setClientErrors([]);
@@ -107,7 +108,9 @@ export function useFileUpload() {
       
       // 3. Importar pedidos (requiere aeropuertos) con filtrado opcional por tiempo
       if (filesState.pedidos?.file) {
-        const ordersResult = await importOrders(filesState.pedidos.file, horaInicio, horaFin);
+        const ordersResult = await importOrders(filesState.pedidos.file, modoSimulacion, horaInicio,
+          horaFin
+        );
         if (!ordersResult.success) {
           throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
         }

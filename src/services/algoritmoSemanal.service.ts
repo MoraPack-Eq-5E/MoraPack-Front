@@ -174,3 +174,46 @@ export async function ejecutarAlgoritmo(
   return response.json();
 }
 
+//COLAPSO
+export interface ResultadoColapsoDTO {
+  exitoso: boolean;
+  mensaje: string;
+  horaInicio: string;
+  horaFin: string;
+  duracionSegundos: number;
+  iteracionesTotales: number;
+  tipoColapso: string;
+  condicionesColapso: string[];
+  bottlenecks: string[];
+  pedidosAsignados: number;
+  pedidosTotales: number;
+  almacenesLlenos: number;
+  vuelosSaturados: number;
+  //rutasProductos: RutaProductoDTO[]; 
+  metricasDetalladas: Record<string, unknown>;
+  // NUEVO: Agregar línea de tiempo para el mapa
+  lineaDeTiempo?: LineaDeTiempoSimulacionDTO;
+}
+
+/**
+ * Ejecuta el algoritmo ALNS en modo colapso
+ * POST /api/algoritmo/colapso
+ */
+export async function ejecutarAlgoritmoColapso(
+  request: AlgoritmoRequest
+): Promise<ResultadoColapsoDTO> {
+  const response = await fetch(`${API_BASE}/api/algoritmo/colapso`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.mensaje || `Error al ejecutar algoritmo de colapso: ${response.statusText}`);
+  }
+
+  return response.json();
+}
