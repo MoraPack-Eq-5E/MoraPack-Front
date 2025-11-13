@@ -165,7 +165,7 @@ export function useFileUpload() {
           results.push(message);
         } else {
           // Múltiples archivos: usar importación batch
-          const batchResult = await importOrdersBatch(pedidosFiles, horaInicio, horaFin);
+          const batchResult = await importOrdersBatch(pedidosFiles, modoSimulacion,horaInicio, horaFin);
           if (!batchResult.success) {
             throw new Error(`Error al importar pedidos en batch: ${batchResult.message}`);
           }

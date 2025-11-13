@@ -296,174 +296,72 @@ export function SimulacionPage() {
   const resultado = resultadoAlgoritmo as ResultadoColapsoDTO;
   
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              🚨 Resultados de Simulación por Colapso
-            </h2>
-            
-            {/* Métricas principales de colapso */}
-            <div className="grid grid-cols-4 gap-4 mb-3">
-              <div className="bg-green-50 rounded-lg p-3">
-                <p className="text-xs text-green-700">Pedidos Asignados</p>
-                <p className="text-2xl font-bold text-green-900">{resultado.pedidosAsignados}</p>
-                <p className="text-xs text-green-600">de {resultado.pedidosTotales} total</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-3">
-                <p className="text-xs text-red-700">Almacenes Llenos</p>
-                <p className="text-2xl font-bold text-red-900">{resultado.almacenesLlenos}</p>
-              </div>
-              <div className="bg-orange-50 rounded-lg p-3">
-                <p className="text-xs text-orange-700">Vuelos Saturados</p>
-                <p className="text-2xl font-bold text-orange-900">{resultado.vuelosSaturados}</p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-3">
-                <p className="text-xs text-purple-700">Iteraciones</p>
-                <p className="text-2xl font-bold text-purple-900">{resultado.iteracionesTotales}</p>
-                <p className="text-xs text-purple-600">{resultado.duracionSegundos}s</p>
-              </div>
-            </div>
-            
-            <div className="flex gap-4 text-sm">
-              <div className="bg-yellow-50 px-3 py-1 rounded-full">
-                <span className="text-yellow-800 font-medium">Tipo de colapso: </span>
-                <span className="text-yellow-900">{resultado.tipoColapso}</span>
-              </div>
-              <div className="bg-blue-50 px-3 py-1 rounded-full">
-                <span className="text-blue-800 font-medium">Duración: </span>
-                <span className="text-blue-900">{Math.floor(resultado.duracionSegundos / 60)}m {resultado.duracionSegundos % 60}s</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={handleVerResultados}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              Consultar detalles
-            </button>
-            <button
-              onClick={handleRestart}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
-            >
-              Nueva simulación
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex-1 overflow-auto">
-        {/* Sección del mapa - AHORA EN LA PARTE SUPERIOR */}
-        {resultado.lineaDeTiempo && !airportsLoading ? (
-          <div className="h-2/3 border-b border-gray-200">
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900">
-                🗺️ Evolución de Rutas hasta el Colapso
-              </h3>
+      <div className="h-full flex flex-col">
+        {/* Barra superior minimalista para colapso */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                🚨 Simulación por Colapso
+              </h2>
               <p className="text-sm text-gray-600">
-                Mostrando {resultado.lineaDeTiempo.totalEventos} eventos desde el inicio hasta la detección del colapso
+                {resultado.tipoColapso} • {Math.floor(resultado.duracionSegundos / 60)}m {resultado.duracionSegundos % 60}s
               </p>
             </div>
-            <div className="h-full">
-              <MapViewTemporal 
-                resultado={({
-                  // Crear un objeto compatible con AlgoritmoResponse
-                  exito: true,
-                  mensaje: `Simulación de colapso: ${resultado.tipoColapso}`,
-                  lineaDeTiempo: resultado.lineaDeTiempo,
-                  // tiempos aproximados para cumplir la forma esperada por AlgoritmoResponse
-                  tiempoInicioEjecucion: new Date().toISOString(),
-                  tiempoFinEjecucion: new Date(Date.now() + (resultado.duracionSegundos || 0) * 1000).toISOString(),
-                  tiempoEjecucionSegundos: resultado.duracionSegundos || 0,
-                  // Campos numéricos/estadísticos que MapViewTemporal puede necesitar
-                  totalProductos: resultado.pedidosAsignados,
-                  totalPedidos: resultado.pedidosTotales,
-                  productosAsignados: resultado.pedidosAsignados,
-                  pedidosAsignados: resultado.pedidosAsignados,
-                  costoTotal: 0,
-                } as AlgoritmoResponse)}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="h-2/3 flex items-center justify-center bg-gray-100 border-b border-gray-200">
-            <div className="text-center p-8">
-              <div className="text-gray-400 mb-2">
-                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.927-6-2.445M12 6V4m0 0V4m0 0H8m4 0h4" />
-                </svg>
-              </div>
-              <p className="text-gray-500 mb-2">No hay datos de timeline disponibles</p>
-              <p className="text-sm text-gray-400">
-                El colapso ocurrió antes de que se pudieran capturar eventos de simulación
-              </p>
-            </div>
-          </div>
-        )}
-        
-        {/* Sección de métricas y detalles - AHORA EN LA PARTE INFERIOR */}
-        <div className="h-1/3 overflow-auto p-6">
-          {/* Condiciones de colapso */}
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <h3 className="font-semibold text-red-900 mb-3">🚨 Condiciones de Colapso Detectadas</h3>
-            <ul className="space-y-2">
-              {resultado.condicionesColapso.map((condicion, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-red-800">
-                  <span className="text-red-500 mt-0.5">•</span>
-                  <span>{condicion}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Bottlenecks */}
-          <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <h3 className="font-semibold text-orange-900 mb-3">📊 Cuellos de Botella Identificados</h3>
-            <ul className="space-y-2">
-              {resultado.bottlenecks.map((bottleneck, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-orange-800">
-                  <span className="text-orange-500 mt-0.5">•</span>
-                  <span>{bottleneck}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Métricas detalladas */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">📈 Métricas Detalladas del Colapso</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Iteración de detección:</span>
-                <span className="ml-2 font-medium">{resultado.iteracionesTotales}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Tasa de asignación:</span>
-                <span className="ml-2 font-medium">
-                  {((resultado.pedidosAsignados / resultado.pedidosTotales) * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Duración total:</span>
-                <span className="ml-2 font-medium">
-                  {Math.floor(resultado.duracionSegundos / 60)}m {resultado.duracionSegundos % 60}s
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Eventos capturados:</span>
-                <span className="ml-2 font-medium">
-                  {resultado.lineaDeTiempo?.totalEventos || 0}
-                </span>
-              </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleVerResultados}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              >
+                Ver detalles
+              </button>
+              <button
+                onClick={handleRestart}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                Nueva simulación
+              </button>
             </div>
           </div>
         </div>
+        
+        {/* Mapa ocupa todo el espacio */}
+        <div className="flex-1 overflow-hidden">
+          {resultado.lineaDeTiempo && !airportsLoading ? (
+            <MapViewTemporal 
+              resultado={({
+                exito: true,
+                mensaje: `Simulación de colapso: ${resultado.tipoColapso}`,
+                lineaDeTiempo: resultado.lineaDeTiempo,
+                tiempoInicioEjecucion: new Date().toISOString(),
+                tiempoFinEjecucion: new Date(Date.now() + (resultado.duracionSegundos || 0) * 1000).toISOString(),
+                tiempoEjecucionSegundos: resultado.duracionSegundos || 0,
+                totalProductos: resultado.pedidosAsignados,
+                totalPedidos: resultado.pedidosTotales,
+                productosAsignados: resultado.pedidosAsignados,
+                pedidosAsignados: resultado.pedidosAsignados,
+                costoTotal: 0,
+              } as AlgoritmoResponse)}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <div className="text-gray-400 mb-2">
+                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500">No hay datos de timeline disponibles</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  El colapso ocurrió antes de capturar eventos
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
 };
   // ==================== UTILIDADES ====================
   

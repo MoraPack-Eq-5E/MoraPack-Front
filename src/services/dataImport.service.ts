@@ -100,15 +100,16 @@ export async function importOrders(
   const formData = new FormData();
   formData.append('file', file);
 
-  // ⚙️ Todo va en el mismo cuerpo form-data
-  if (horaInicio) formData.append('horaInicio', horaInicio);
-  if (horaFin) formData.append('horaFin', horaFin);
-  if (modo) formData.append('modo', modo);
+  // ⚠️ CORREGIR: Enviar modo como query parameter, NO como form-data
+  const queryParams = new URLSearchParams();
+  queryParams.append('modo', modo); // ✅ Esto va en la URL
+  if (horaInicio) queryParams.append('horaInicio', horaInicio);
+  if (horaFin) queryParams.append('horaFin', horaFin);
 
   try {
-    const response = await fetch(`${API_URL}/api/data-import/orders`, {
+    const response = await fetch(`${API_URL}/api/data-import/orders?${queryParams.toString()}`, {
       method: 'POST',
-      body: formData,
+      body: formData, // Solo el archivo va en el body
     });
 
     const result: ImportResult = await response.json();
@@ -161,6 +162,7 @@ export interface BatchImportResult {
  */
 export async function importOrdersBatch(
   files: File[], 
+  modo: string, // 🔥 AÑADIR este parámetro
   horaInicio?: string, 
   horaFin?: string
 ): Promise<BatchImportResult> {
@@ -173,6 +175,7 @@ export async function importOrdersBatch(
 
   // Construir URL con parámetros opcionales
   const url = new URL(`${API_URL}/api/data-import/orders/batch`);
+  url.searchParams.append('modo', modo); // ✅ Añadir modo
   if (horaInicio) {
     url.searchParams.append('horaInicio', horaInicio);
   }
