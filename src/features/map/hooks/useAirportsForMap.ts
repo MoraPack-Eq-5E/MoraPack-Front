@@ -186,6 +186,7 @@ export function useAirportsForMap() {
     queryFn: fetchAirportsFromBackend,
     staleTime: 5 * 60 * 1000, // 5 minutos
     retry: 2,
+    enabled: false, // NO hacer fetch automático - solo cuando se llame refetch() después de cargar datos
   });
 
   return {
