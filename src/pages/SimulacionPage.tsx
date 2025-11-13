@@ -477,53 +477,53 @@ export function SimulacionPage() {
   
   return (
     <div className="h-full flex flex-col">
-      {/* Step indicator - Mismo que antes */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <StepIndicator
-            number={1}
-            title="Cargar Datos"
-            isActive={currentStep === 'load-data'}
-            isCompleted={currentStep !== 'load-data'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep !== 'load-data' ? 'w-full' : 'w-0'
-            }`} />
+      {/* Step indicator - Oculto cuando estamos en resultados */}
+      {currentStep !== 'results' && (
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <StepIndicator
+              number={1}
+              title="Cargar Datos"
+              isActive={currentStep === 'load-data'}
+              isCompleted={currentStep !== 'load-data'}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-blue-600 transition-all ${
+                currentStep !== 'load-data' ? 'w-full' : 'w-0'
+              }`} />
+            </div>
+            
+            <StepIndicator
+              number={2}
+              title="Configurar"
+              isActive={currentStep === 'config'}
+              isCompleted={currentStep === 'running'}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-blue-600 transition-all ${
+                currentStep === 'running' ? 'w-full' : 'w-0'
+              }`} />
+            </div>
+            
+            <StepIndicator
+              number={3}
+              title="Ejecutar"
+              isActive={currentStep === 'running'}
+              isCompleted={false}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-gray-200 transition-all w-0`} />
+            </div>
+            
+            <StepIndicator
+              number={4}
+              title="Resultados"
+              isActive={false}
+              isCompleted={false}
+            />
           </div>
-          
-          <StepIndicator
-            number={2}
-            title="Configurar"
-            isActive={currentStep === 'config'}
-            isCompleted={currentStep === 'running' || currentStep === 'results'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'running' || currentStep === 'results' ? 'w-full' : 'w-0'
-            }`} />
-          </div>
-          
-          <StepIndicator
-            number={3}
-            title="Ejecutar"
-            isActive={currentStep === 'running'}
-            isCompleted={currentStep === 'results'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'results' ? 'w-full' : 'w-0'
-            }`} />
-          </div>
-          
-          <StepIndicator
-            number={4}
-            title="Resultados"
-            isActive={currentStep === 'results'}
-            isCompleted={false}
-          />
         </div>
-      </div>
+      )}
       
       {/* Content */}
       <div className="flex-1 overflow-auto">
