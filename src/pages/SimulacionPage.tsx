@@ -176,14 +176,16 @@ export function SimulacionPage() {
     }
   };
   
-  const handleRestart = () => {
-    setCurrentStep('load-data');
-    setDataCargada(false);
-    setResultadoCarga(null);
-    setEstadoDatos(null);
-    setResultadoAlgoritmo(null);
-    setError(null);
-  };
+  // Función para reiniciar la simulación (actualmente no usada en UI)
+  // Se puede agregar como botón flotante en el mapa si se necesita
+  // const handleRestart = () => {
+  //   setCurrentStep('load-data');
+  //   setDataCargada(false);
+  //   setResultadoCarga(null);
+  //   setEstadoDatos(null);
+  //   setResultadoAlgoritmo(null);
+  //   setError(null);
+  // };
   
   // ==================== UTILIDADES ====================
   
@@ -197,53 +199,53 @@ export function SimulacionPage() {
   
   return (
     <div className="h-full flex flex-col">
-      {/* Step indicator */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <StepIndicator
-            number={1}
-            title="Cargar Datos"
-            isActive={currentStep === 'load-data'}
-            isCompleted={currentStep !== 'load-data'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep !== 'load-data' ? 'w-full' : 'w-0'
-            }`} />
+      {/* Step indicator - Oculto cuando estamos en resultados */}
+      {currentStep !== 'results' && (
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <StepIndicator
+              number={1}
+              title="Cargar Datos"
+              isActive={currentStep === 'load-data'}
+              isCompleted={currentStep !== 'load-data'}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-blue-600 transition-all ${
+                currentStep !== 'load-data' ? 'w-full' : 'w-0'
+              }`} />
+            </div>
+            
+            <StepIndicator
+              number={2}
+              title="Configurar"
+              isActive={currentStep === 'config'}
+              isCompleted={currentStep === 'running'}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-blue-600 transition-all ${
+                currentStep === 'running' ? 'w-full' : 'w-0'
+              }`} />
+            </div>
+            
+            <StepIndicator
+              number={3}
+              title="Ejecutar"
+              isActive={currentStep === 'running'}
+              isCompleted={false}
+            />
+            <div className="flex-1 h-1 bg-gray-200 mx-4">
+              <div className={`h-full bg-gray-200 transition-all w-0`} />
+            </div>
+            
+            <StepIndicator
+              number={4}
+              title="Resultados"
+              isActive={false}
+              isCompleted={false}
+            />
           </div>
-          
-          <StepIndicator
-            number={2}
-            title="Configurar"
-            isActive={currentStep === 'config'}
-            isCompleted={currentStep === 'running' || currentStep === 'results'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'running' || currentStep === 'results' ? 'w-full' : 'w-0'
-            }`} />
-          </div>
-          
-          <StepIndicator
-            number={3}
-            title="Ejecutar"
-            isActive={currentStep === 'running'}
-            isCompleted={currentStep === 'results'}
-          />
-          <div className="flex-1 h-1 bg-gray-200 mx-4">
-            <div className={`h-full bg-blue-600 transition-all ${
-              currentStep === 'results' ? 'w-full' : 'w-0'
-            }`} />
-          </div>
-          
-          <StepIndicator
-            number={4}
-            title="Resultados"
-            isActive={currentStep === 'results'}
-            isCompleted={false}
-          />
         </div>
-      </div>
+      )}
       
       {/* Content */}
       <div className="flex-1 overflow-auto">
@@ -464,58 +466,9 @@ export function SimulacionPage() {
         
         {currentStep === 'results' && resultadoAlgoritmo && (
           <div className="h-full flex flex-col">
-            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    Resultados de Simulación Semanal
-                  </h2>
-                  
-                  {/* Métricas principales */}
-                  <div className="grid grid-cols-4 gap-4 mb-3">
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <p className="text-xs text-green-700">Productos Asignados</p>
-                      <p className="text-2xl font-bold text-green-900">{resultadoAlgoritmo.productosAsignados}</p>
-                      <p className="text-xs text-green-600">{((resultadoAlgoritmo.productosAsignados / resultadoAlgoritmo.totalProductos) * 100).toFixed(1)}% de asignación</p>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <p className="text-xs text-blue-700">Pedidos Procesados</p>
-                      <p className="text-2xl font-bold text-blue-900">{resultadoAlgoritmo.pedidosAsignados}</p>
-                      <p className="text-xs text-blue-600">{resultadoAlgoritmo.totalPedidos} total</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-3">
-                      <p className="text-xs text-purple-700">Costo Total</p>
-                      <p className="text-2xl font-bold text-purple-900">${resultadoAlgoritmo.costoTotal?.toFixed(2) || 0}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-700">Tiempo Ejecución</p>
-                      <p className="text-2xl font-bold text-gray-900">{Math.floor((resultadoAlgoritmo.tiempoEjecucionSegundos || 0) / 60)}m</p>
-                      <p className="text-xs text-gray-600">{resultadoAlgoritmo.tiempoEjecucionSegundos || 0}s</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-sm text-gray-600">
-                    Simulación: {resultadoAlgoritmo.horaInicioSimulacion && new Date(resultadoAlgoritmo.horaInicioSimulacion).toLocaleString()} - {resultadoAlgoritmo.horaFinSimulacion && new Date(resultadoAlgoritmo.horaFinSimulacion).toLocaleString()}
-                  </p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleVerResultados}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                  >
-                    Consultar detalles
-                  </button>
-                <button
-                  onClick={handleRestart}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
-                >
-                  Nueva simulación
-                </button>
-              </div>
-            </div>
-            </div>
+            {/* Header de métricas - ELIMINADO para dar más espacio al mapa */}
             
+            {/* Mapa a pantalla completa */}
             <div className="flex-1 overflow-hidden">
               {resultadoAlgoritmo?.lineaDeTiempo && !airportsLoading ? (
                 <MapViewTemporal 
