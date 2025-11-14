@@ -13,6 +13,7 @@ export { DashboardPage } from './DashboardPage';
 export { EnVivoPage } from './EnVivoPage';
 export { SimulacionPage } from './SimulacionPage';
 export { AirportsPage } from './AirportsPage';
+export { OperacionDiariaPage } from './OperacionDiariaPage';
 // export { HomePage } from './home';
 // export { DashboardPage } from './dashboard';
 // export { ReportsPage } from './reports';

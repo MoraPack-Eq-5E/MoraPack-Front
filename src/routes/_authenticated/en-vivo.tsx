@@ -4,8 +4,8 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router';
-import { EnVivoPage } from '@/pages';
+import { OperacionDiariaPage } from '@/pages';
 
 export const Route = createFileRoute('/_authenticated/en-vivo')({
-  component: EnVivoPage,
+  component: OperacionDiariaPage,
 });
