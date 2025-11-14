@@ -126,6 +126,25 @@ export async function importOrders(
     throw error;
   }
 }
+export async function importCancellations(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch(`${API_URL}/api/data-import/cancelaciones`, {
+      method: 'POST',
+      body: formData,
+    });
+    const result: ImportResult = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Error importando cancelaciones');
+    }
+    return result;
+  } catch (error) {
+    console.error('Error importando cancelaciones:', error);
+    throw error;
+  }
+}
 
 /**
  * Resultado detallado de batch import
