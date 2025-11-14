@@ -201,6 +201,17 @@ export function SimulacionPage() {
     fecha.setDate(fecha.getDate() + dias);
     return fecha.toISOString().slice(0, 19);
   }
+
+  function formatearFechaLegible(fechaISO: string): string {
+    const fecha = new Date(fechaISO);
+    return fecha.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: 'long', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
   
   // ==================== RENDER ====================
   
@@ -293,7 +304,7 @@ export function SimulacionPage() {
                     max={30}
                   />
                   <p className="text-xs text-blue-700 mt-1">
-                    Se cargarán pedidos desde {config.horaInicioSimulacion} hasta {calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!)}
+                    Se cargarán pedidos desde <strong>{formatearFechaLegible(config.horaInicioSimulacion!)}</strong> hasta <strong>{formatearFechaLegible(calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!))}</strong>
                   </p>
                 </div>
               </div>
