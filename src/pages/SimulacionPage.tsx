@@ -211,165 +211,127 @@ export function SimulacionPage() {
     setError(null);
   };
   // ==================== RENDERIZADO CONDICIONAL ======================================
-  const renderResultadosSemanales = () => (
-    <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Resultados de Simulación Semanal
-            </h2>
+//   const renderResultadosSemanales = () => (
+//     <div className="h-full flex flex-col">
+//       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+//         <div className="flex justify-between items-start">
+//           <div className="flex-1">
+//             <h2 className="text-lg font-semibold text-gray-900 mb-2">
+//               Resultados de Simulación Semanal
+//             </h2>
             
-            {/* Métricas principales */}
-            <div className="grid grid-cols-4 gap-4 mb-3">
-              <div className="bg-green-50 rounded-lg p-3">
-                <p className="text-xs text-green-700">Productos Asignados</p>
-                <p className="text-2xl font-bold text-green-900">
-                  {('productosAsignados' in resultadoAlgoritmo!) ? resultadoAlgoritmo.productosAsignados : 'N/A'}
-                </p>
-                <p className="text-xs text-green-600">
-                  {((('productosAsignados' in resultadoAlgoritmo!) ? resultadoAlgoritmo.productosAsignados : 0) / 
-                    ('totalProductos' in resultadoAlgoritmo! ? resultadoAlgoritmo.totalProductos : 1) * 100).toFixed(1)}% de asignación
-                </p>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-3">
-                <p className="text-xs text-blue-700">Pedidos Procesados</p>
-                <p className="text-2xl font-bold text-blue-900">
-                  {('pedidosAsignados' in resultadoAlgoritmo!) ? resultadoAlgoritmo.pedidosAsignados : 0}
-                </p>
-                <p className="text-xs text-blue-600">
-                  {('totalPedidos' in resultadoAlgoritmo! ? resultadoAlgoritmo.totalPedidos : 0)} total
-                </p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-3">
-                <p className="text-xs text-purple-700">Costo Total</p>
-                <p className="text-2xl font-bold text-purple-900">
-                  ${('costoTotal' in resultadoAlgoritmo! ? resultadoAlgoritmo.costoTotal?.toFixed(2) : 0) || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-700">Tiempo Ejecución</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {Math.floor((('tiempoEjecucionSegundos' in resultadoAlgoritmo! ? resultadoAlgoritmo.tiempoEjecucionSegundos : 0) || 0) / 60)}m
-                </p>
-                <p className="text-xs text-gray-600">
-                  {('tiempoEjecucionSegundos' in resultadoAlgoritmo! ? resultadoAlgoritmo.tiempoEjecucionSegundos : 0) || 0}s
-                </p>
-              </div>
-            </div>
-            
-            <p className="text-sm text-gray-600">
-              Simulación: {'horaInicioSimulacion' in resultadoAlgoritmo! && resultadoAlgoritmo.horaInicioSimulacion && 
-                new Date(resultadoAlgoritmo.horaInicioSimulacion).toLocaleString()} - 
-              {'horaFinSimulacion' in resultadoAlgoritmo! && resultadoAlgoritmo.horaFinSimulacion && 
-                new Date(resultadoAlgoritmo.horaFinSimulacion).toLocaleString()}
-            </p>
-          </div>
+//             <p className="text-sm text-gray-600">
+//               Simulación: {'horaInicioSimulacion' in resultadoAlgoritmo! && resultadoAlgoritmo.horaInicioSimulacion && 
+//                 new Date(resultadoAlgoritmo.horaInicioSimulacion).toLocaleString()} - 
+//               {'horaFinSimulacion' in resultadoAlgoritmo! && resultadoAlgoritmo.horaFinSimulacion && 
+//                 new Date(resultadoAlgoritmo.horaFinSimulacion).toLocaleString()}
+//             </p>
+//           </div>
           
-          <div className="flex gap-2">
-            <button
-              onClick={handleVerResultados}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              Consultar detalles
-            </button>
-            <button
-              onClick={handleRestart}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
-            >
-              Nueva simulación
-            </button>
-          </div>
-        </div>
-      </div>
+//           <div className="flex gap-2">
+//             <button
+//               onClick={handleVerResultados}
+//               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+//             >
+//               Consultar detalles
+//             </button>
+//             <button
+//               onClick={handleRestart}
+//               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+//             >
+//               Nueva simulación
+//             </button>
+//           </div>
+//         </div>
+//       </div>
       
-      <div className="flex-1 overflow-hidden">
-        {'lineaDeTiempo' in resultadoAlgoritmo! && resultadoAlgoritmo.lineaDeTiempo && !airportsLoading ? (
-          <MapViewTemporal 
-            resultado={resultadoAlgoritmo as AlgoritmoResponse}
-          />
-        ) : (
-          <div className="h-full flex items-center justify-center bg-gray-100">
-            <div className="text-center p-8 max-w-xl">
-              {/* Mismo contenido de loading/error que antes */}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+//       <div className="flex-1 overflow-hidden">
+//         {'lineaDeTiempo' in resultadoAlgoritmo! && resultadoAlgoritmo.lineaDeTiempo && !airportsLoading ? (
+//           <MapViewTemporal 
+//             resultado={resultadoAlgoritmo as AlgoritmoResponse}
+//           />
+//         ) : (
+//           <div className="h-full flex items-center justify-center bg-gray-100">
+//             <div className="text-center p-8 max-w-xl">
+//               {/* Mismo contenido de loading/error que antes */}
+//             </div>
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
 
-  const renderResultadosColapso = () => {
-  const resultado = resultadoAlgoritmo as ResultadoColapsoDTO;
+//   const renderResultadosColapso = () => {
+//   const resultado = resultadoAlgoritmo as ResultadoColapsoDTO;
   
-  return (
-      <div className="h-full flex flex-col">
-        {/* Barra superior minimalista para colapso */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                🚨 Simulación por Colapso
-              </h2>
-              <p className="text-sm text-gray-600">
-                {resultado.tipoColapso} • {Math.floor(resultado.duracionSegundos / 60)}m {resultado.duracionSegundos % 60}s
-              </p>
-            </div>
+//   return (
+//       <div className="h-full flex flex-col">
+//         {/* Barra superior minimalista para colapso */}
+//         <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
+//           <div className="flex justify-between items-center">
+//             <div>
+//               <h2 className="text-lg font-semibold text-gray-900">
+//                 🚨 Simulación por Colapso
+//               </h2>
+//               <p className="text-sm text-gray-600">
+//                 {resultado.tipoColapso} • {Math.floor(resultado.duracionSegundos / 60)}m {resultado.duracionSegundos % 60}s
+//               </p>
+//             </div>
             
-            <div className="flex gap-2">
-              <button
-                onClick={handleVerResultados}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-              >
-                Ver detalles
-              </button>
-              <button
-                onClick={handleRestart}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
-              >
-                Nueva simulación
-              </button>
-            </div>
-          </div>
-        </div>
+//             <div className="flex gap-2">
+//               <button
+//                 onClick={handleVerResultados}
+//                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+//               >
+//                 Ver detalles
+//               </button>
+//               <button
+//                 onClick={handleRestart}
+//                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+//               >
+//                 Nueva simulación
+//               </button>
+//             </div>
+//           </div>
+//         </div>
         
-        {/* Mapa ocupa todo el espacio */}
-        <div className="flex-1 overflow-hidden">
-          {resultado.lineaDeTiempo && !airportsLoading ? (
-            <MapViewTemporal 
-              resultado={({
-                exito: true,
-                mensaje: `Simulación de colapso: ${resultado.tipoColapso}`,
-                lineaDeTiempo: resultado.lineaDeTiempo,
-                tiempoInicioEjecucion: new Date().toISOString(),
-                tiempoFinEjecucion: new Date(Date.now() + (resultado.duracionSegundos || 0) * 1000).toISOString(),
-                tiempoEjecucionSegundos: resultado.duracionSegundos || 0,
-                totalProductos: resultado.pedidosAsignados,
-                totalPedidos: resultado.pedidosTotales,
-                productosAsignados: resultado.pedidosAsignados,
-                pedidosAsignados: resultado.pedidosAsignados,
-                costoTotal: 0,
-              } as AlgoritmoResponse)}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <div className="text-gray-400 mb-2">
-                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <p className="text-gray-500">No hay datos de timeline disponibles</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  El colapso ocurrió antes de capturar eventos
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-};
+//         {/* Mapa ocupa todo el espacio */}
+//         <div className="flex-1 overflow-hidden">
+//           {resultado.lineaDeTiempo && !airportsLoading ? (
+//             <MapViewTemporal 
+//               resultado={({
+//                 exito: true,
+//                 mensaje: `Simulación de colapso: ${resultado.tipoColapso}`,
+//                 lineaDeTiempo: resultado.lineaDeTiempo,
+//                 tiempoInicioEjecucion: new Date().toISOString(),
+//                 tiempoFinEjecucion: new Date(Date.now() + (resultado.duracionSegundos || 0) * 1000).toISOString(),
+//                 tiempoEjecucionSegundos: resultado.duracionSegundos || 0,
+//                 totalProductos: resultado.pedidosAsignados,
+//                 totalPedidos: resultado.pedidosTotales,
+//                 productosAsignados: resultado.pedidosAsignados,
+//                 pedidosAsignados: resultado.pedidosAsignados,
+//                 costoTotal: 0,
+//               } as AlgoritmoResponse)}
+//             />
+//           ) : (
+//             <div className="h-full flex items-center justify-center bg-gray-100">
+//               <div className="text-center">
+//                 <div className="text-gray-400 mb-2">
+//                   <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+//                   </svg>
+//                 </div>
+//                 <p className="text-gray-500">No hay datos de timeline disponibles</p>
+//                 <p className="text-sm text-gray-400 mt-1">
+//                   El colapso ocurrió antes de capturar eventos
+//                 </p>
+//               </div>
+//             </div>
+//           )}
+//         </div>
+//       </div>
+//     );
+// };
   // ==================== UTILIDADES ====================
   
   function calcularHoraFin(horaInicio: string, dias: number): string {
@@ -759,11 +721,12 @@ export function SimulacionPage() {
         )}
         
         {currentStep === 'results' && resultadoAlgoritmo && (
-          <><>
-            {modoSimulacion === 'SEMANAL'
-              ? renderResultadosSemanales()
-              : renderResultadosColapso()}
-          </><div className="h-full flex flex-col">
+          // <><>
+          //   {modoSimulacion === 'SEMANAL'
+          //     ? renderResultadosSemanales()
+          //     : renderResultadosColapso()}
+          // </>
+            <div className="h-full flex flex-col">
               {/* Header de métricas - ELIMINADO para dar más espacio al mapa */}
 
               {/* Mapa a pantalla completa */}
@@ -832,7 +795,7 @@ export function SimulacionPage() {
                   </div>
                 )}
               </div>
-            </div></>
+            </div>
         )}
       </div>
     </div>
