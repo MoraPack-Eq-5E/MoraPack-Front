@@ -40,7 +40,7 @@ export function SimulacionPage() {
   const [error, setError] = useState<string | null>(null);
   
   // Hook para obtener aeropuertos
-  const { isLoading: airportsLoading } = useAirportsForMap();
+  const { airports, isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
   
   // Configuración del algoritmo semanal (simplificada)
   const [config, setConfig] = useState<AlgoritmoRequest>({
@@ -64,6 +64,9 @@ export function SimulacionPage() {
       // Solo necesitamos consultar el estado
       console.log('✅ Archivos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
       console.log('📊 Consultando estado de base de datos...');
+      
+      // IMPORTANTE: Refetch de aeropuertos después de importar
+      await refetchAirports();
       
       // Obtener estado de datos desde BD
       const estado = await obtenerEstadoDatos();
@@ -104,6 +107,10 @@ export function SimulacionPage() {
     
     try {
       console.log('📥 Cargando pedidos desde directorio del servidor...');
+      
+      // IMPORTANTE: Refetch de aeropuertos por si fueron cargados en el servidor
+      await refetchAirports();
+      
       const resultado = await cargarPedidos({
         modo: modoSimulacion, // 'SEMANAL' o 'COLAPSO'
         horaInicio: modoSimulacion === 'SEMANAL' ? config.horaInicioSimulacion : undefined,
@@ -752,12 +759,80 @@ export function SimulacionPage() {
         )}
         
         {currentStep === 'results' && resultadoAlgoritmo && (
-          <>
-            {modoSimulacion === 'SEMANAL' 
+          <><>
+            {modoSimulacion === 'SEMANAL'
               ? renderResultadosSemanales()
-              : renderResultadosColapso()
-            }
-          </>
+              : renderResultadosColapso()}
+          </><div className="h-full flex flex-col">
+              {/* Header de métricas - ELIMINADO para dar más espacio al mapa */}
+
+              {/* Mapa a pantalla completa */}
+              <div className="flex-1 overflow-hidden">
+                {resultadoAlgoritmo?.lineaDeTiempo && !airportsLoading ? (
+                  <MapViewTemporal
+                    resultado={
+                      modoSimulacion === 'SEMANAL'
+                        ? (resultadoAlgoritmo as AlgoritmoResponse)
+                        : ({
+                            exito: true,
+                            mensaje: `Simulación de colapso: ${(resultadoAlgoritmo as ResultadoColapsoDTO).tipoColapso}`,
+                            lineaDeTiempo: (resultadoAlgoritmo as ResultadoColapsoDTO).lineaDeTiempo,
+                            tiempoInicioEjecucion: new Date().toISOString(),
+                            tiempoFinEjecucion: new Date(Date.now() + ((resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0) * 1000).toISOString(),
+                            tiempoEjecucionSegundos: (resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0,
+                            totalProductos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                            totalPedidos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosTotales,
+                            productosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                            pedidosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                            costoTotal: 0,
+                          } as AlgoritmoResponse)
+                    }
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center bg-gray-100">
+                    <div className="text-center p-8 max-w-xl">
+                      {airportsLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            Cargando aeropuertos...
+                          </h3>
+                          <p className="text-gray-600">
+                            Preparando visualización del mapa
+                          </p>
+                        </>
+                      ) : !resultadoAlgoritmo?.lineaDeTiempo ? (
+                        <>
+                          <div className="text-6xl mb-4">⚠️</div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            Timeline no disponible
+                          </h3>
+                          <p className="text-gray-600 mb-4">
+                            El algoritmo completó, pero no retornó el timeline de simulación.
+                          </p>
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left">
+                            <p className="text-sm text-yellow-900 mb-2">
+                              <strong>Posibles causas:</strong>
+                            </p>
+                            <ul className="text-xs text-yellow-800 space-y-1 list-disc list-inside">
+                              <li>El backend no generó eventos de vuelo</li>
+                              <li>No hay vuelos asignados en el resultado</li>
+                              <li>El campo <code className="bg-yellow-100 px-1 rounded">lineaDeTiempo</code> es null</li>
+                            </ul>
+                          </div>
+                          <button
+                            onClick={handleVerResultados}
+                            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                          >
+                            Ver Detalles en Consola
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div></>
         )}
       </div>
     </div>

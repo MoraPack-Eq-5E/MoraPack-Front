@@ -5,7 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Aeropuerto } from '@/types/map.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 interface AirportBackendResponse {
   id: number;
@@ -144,9 +144,9 @@ function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
  * Obtiene aeropuertos desde el backend
  */
 async function fetchAirportsFromBackend(): Promise<Aeropuerto[]> {
-  console.log('[fetchAirportsFromBackend] Fetching desde:', `${API_BASE_URL}/aeropuertos`);
+  console.log('[fetchAirportsFromBackend] Fetching desde:', `${API_BASE_URL}/api/aeropuertos`);
   
-  const response = await fetch(`${API_BASE_URL}/aeropuertos`);
+  const response = await fetch(`${API_BASE_URL}/api/aeropuertos`);
   
   if (!response.ok) {
     throw new Error(`Error al obtener aeropuertos: ${response.statusText}`);
@@ -186,6 +186,7 @@ export function useAirportsForMap() {
     queryFn: fetchAirportsFromBackend,
     staleTime: 5 * 60 * 1000, // 5 minutos
     retry: 2,
+    enabled: false, // NO hacer fetch automático - solo cuando se llame refetch() después de cargar datos
   });
 
   return {
