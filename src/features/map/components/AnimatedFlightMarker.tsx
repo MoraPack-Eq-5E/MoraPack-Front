@@ -23,7 +23,6 @@ import {
 interface AnimatedFlightMarkerProps {
   flight: ActiveFlightState;
   curvature?: number;
-  onClick?: () => void;
 }
 
 /**
@@ -31,30 +30,33 @@ interface AnimatedFlightMarkerProps {
  * Optimizado para hardware acceleration
  */
 function createPlaneIcon(bearing: number, color: string): DivIcon {
-  // Intentar usar imagen PNG, fallback a SVG
+  // El SVG del avión apunta hacia el noreste en su diseño original
+  // Necesitamos un offset de -45° para que apunte al norte cuando bearing = 0°
+  const rotation = bearing - 45;
+  
   const planeHTML = `
-    <img 
-      src="/airplane.png" 
-      alt="✈" 
-      class="plane-marker"
+    <svg 
+      width="24" 
+      height="24" 
+      viewBox="0 0 128 128"
       style="
-        width: 20px;
-        height: 20px;
         display: block;
-        transform: rotate(${bearing}deg);
+        transform: rotate(${rotation}deg);
         transform-origin: center center;
         will-change: transform;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) brightness(0) saturate(100%) invert(48%) sepia(99%) saturate(3048%) hue-rotate(${color === '#ef4444' ? '340deg' : color === '#f97316' ? '15deg' : '200deg'}) brightness(100%) contrast(101%);
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         transition: transform 0.2s ease-out;
       "
-    />
+    >
+      <path d="M119.7,18.2c7.8-7.8-3-17.9-10.7-10.3L80.7,36.3L15.8,19.2L5,30l53.5,28.2L36.8,79.8L20,77.7l-8.6,8.6l19.1,10l10,19.1l8.6-8.6l-2-16.7l21.6-21.6l27.6,53.2l10.8-10.8L90.8,47.2L119.7,18.2z" fill="${color}"/>
+    </svg>
   `;
   
   return new DivIcon({ 
     html: planeHTML, 
     className: 'plane-icon', 
-    iconSize: [20, 20], 
-    iconAnchor: [10, 10] 
+    iconSize: [24, 24], 
+    iconAnchor: [12, 12] 
   });
 }
 
@@ -63,8 +65,7 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
  */
 export function AnimatedFlightMarker({ 
   flight, 
-  curvature = 0.25,
-  onClick
+  curvature = 0.25
 }: AnimatedFlightMarkerProps) {
   const map = useMap();
   const markerRef = useRef<LeafletMarker | null>(null);
@@ -84,11 +85,27 @@ export function AnimatedFlightMarker({
     return { start, end, ctrl };
   }, [flight.originLat, flight.originLon, flight.destLat, flight.destLon, curvature]);
 
-  // Color basado en cantidad de productos
+  // Color basado en porcentaje de ocupación de la capacidad del avión
   const color = useMemo(() => {
-    const productCount = flight.productIds.length;
-    return productCount > 100 ? '#ef4444' : productCount > 50 ? '#f97316' : '#3b82f6';
-  }, [flight.productIds.length]);
+    const capacityMax = flight.capacityMax || 300; // Capacidad estándar por defecto
+    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const occupancyPercent = (capacityUsed / capacityMax) * 100;
+    
+    // Colores según imagen:
+    // Verde oscuro: < 70% (Moderada)
+    // Amarillo: 70-85% (Alta)
+    // Naranja: 85-95% (Muy alta)
+    // Rojo: > 95% (Casi lleno)
+    if (occupancyPercent < 70) {
+      return '#059669'; // Verde oscuro (green-600)
+    } else if (occupancyPercent < 85) {
+      return '#eab308'; // Amarillo (yellow-500)
+    } else if (occupancyPercent < 95) {
+      return '#f97316'; // Naranja (orange-500)
+    } else {
+      return '#ef4444'; // Rojo (red-500)
+    }
+  }, [flight.capacityMax, flight.capacityUsed, flight.productIds.length]);
 
   // Calcular posición y rotación en la curva Bezier
   const currentState = useMemo(() => {
@@ -132,31 +149,28 @@ export function AnimatedFlightMarker({
         zIndexOffset: 1000 
       });
 
-      // Agregar popup con info del vuelo
-      const productLine = flight.productIds[0] != null 
-        ? `<div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Producto #${flight.productIds[0]}</div>`
-        : '';
+      // Usar capacityUsed directamente del objeto flight
+      const capacityUsed = flight.capacityUsed || flight.productIds.length;
+      const capacityMax = flight.capacityMax || 360;
+      const progressPercent = Math.round(flight.currentProgress * 100);
       
+      // Usar el código de vuelo sin modificar (ya viene limpio del backend)
+      const cleanFlightCode = flight.flightCode;
+      
+      // Popup profesional sin emojis
       marker.bindPopup(`
-        <div style="min-width: 200px; font-family: sans-serif;">
-          <strong style="font-size: 16px;">Vuelo ${flight.flightCode}</strong><br/>
-          <div style="margin: 8px 0; color: #6b7280;">
-            ${flight.originCode} → ${flight.destinationCode}
+        <div style="min-width: 200px; font-family: system-ui, sans-serif;">
+          <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
+            ${cleanFlightCode}
           </div>
-          ${productLine}
-          <div style="font-size: 13px; color: #374151; margin-top: 6px;">
-            Progreso: <strong>${(flight.currentProgress * 100).toFixed(0)}%</strong>
+          <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
+            <div>${flight.originCode} → ${flight.destinationCode}</div>
+            <div>Estado: <span style="color: #059669; font-weight: 500;">IN_FLIGHT</span></div>
+            <div>Progreso: ${progressPercent}%</div>
+            <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
           </div>
         </div>
       `, { offset: [0, -10] });
-
-      // Agregar handler de click si se proporciona
-      if (onClick) {
-        marker.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          onClick();
-        });
-      }
 
       marker.addTo(map);
       markerRef.current = marker;

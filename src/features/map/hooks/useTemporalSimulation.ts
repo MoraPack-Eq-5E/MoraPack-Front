@@ -24,6 +24,8 @@ export interface ActiveFlight {
   departureTime: Date;
   arrivalTime: Date;
   progress: number; // 0-1
+  capacityMax?: number; // Capacidad máxima del vuelo
+  cantidadProductos?: number; // Cantidad de productos en este vuelo
 }
 
 export interface FlightCapacityEvent {
@@ -183,9 +185,8 @@ export function useTemporalSimulation({
         ) {
           processedCapacityEventsRef.current.add(`${arrivalKey}-capacity`);
           
-          // Extraer cantidad de productos del flightCode (ej: "VL123 (167 pkgs)" -> 167)
-          const productCountMatch = departureEvent.codigoVuelo?.match(/\((\d+)\s+pkgs?\)/);
-          const totalVolume = productCountMatch ? parseInt(productCountMatch[1]) : 1;
+          // Usar cantidadProductos del DTO
+          const totalVolume = departureEvent.cantidadProductos || 1;
           
           onFlightCapacityChangeRef.current({
             eventType: 'ARRIVAL',
@@ -217,9 +218,8 @@ export function useTemporalSimulation({
         ) {
           processedCapacityEventsRef.current.add(`${departureKey}-capacity`);
           
-          // Extraer cantidad de productos del flightCode (ej: "VL123 (167 pkgs)" -> 167)
-          const productCountMatch = departureEvent.codigoVuelo?.match(/\((\d+)\s+pkgs?\)/);
-          const totalVolume = productCountMatch ? parseInt(productCountMatch[1]) : 1;
+          // Usar cantidadProductos del DTO
+          const totalVolume = departureEvent.cantidadProductos || 1;
           
           onFlightCapacityChangeRef.current({
             eventType: 'DEPARTURE',
@@ -247,6 +247,8 @@ export function useTemporalSimulation({
           departureTime,
           arrivalTime: effectiveArrivalTime,
           progress,
+          capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
+          cantidadProductos: departureEvent.cantidadProductos, // Cantidad de productos
         });
       } else {
         // ⏳ Vuelo pendiente

@@ -2,18 +2,19 @@
  * OccupancyLegend - Leyenda de colores de ocupación de vuelos
  * 
  * Muestra una guía visual para entender los colores de los aviones
+ * basados en el porcentaje de ocupación de su capacidad
  */
 
 export function OccupancyLegend() {
   const legendItems = [
-    { color: '#059669', label: '< 70%', description: 'Moderada' },
-    { color: '#eab308', label: '70-85%', description: 'Alta' },
-    { color: '#f97316', label: '85-95%', description: 'Muy alta' },
-    { color: '#ef4444', label: '> 95%', description: 'Casi lleno' },
+    { color: '#059669', label: '< 70%', description: 'Moderada' },      // Verde oscuro
+    { color: '#eab308', label: '70-85%', description: 'Alta' },         // Amarillo
+    { color: '#f97316', label: '85-95%', description: 'Muy alta' },     // Naranja
+    { color: '#ef4444', label: '> 95%', description: 'Casi lleno' },    // Rojo
   ];
 
   return (
-    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200 z-[1000]">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200 z-[999]">
       <div className="flex items-center gap-6">
         <div className="text-sm font-semibold text-gray-700">
           Ocupación de vuelos:

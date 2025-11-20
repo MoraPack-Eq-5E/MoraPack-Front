@@ -136,7 +136,7 @@ export function SimulationControlsFloating({
           </span>
         </div>
         <div className="flex justify-between text-gray-700">
-          <span className="font-medium">Productos entregados:</span>
+          <span className="font-medium">Pedidos entregados:</span>
           <span className="font-semibold text-green-700">
             {completedProductsCount}
           </span>

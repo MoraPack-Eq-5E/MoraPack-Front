@@ -9,15 +9,12 @@ import L from 'leaflet';
 import { useTemporalSimulation, type TimeUnit } from '../hooks/useTemporalSimulation';
 import { useAirportCapacityManager } from '../hooks/useAirportCapacityManager';
 import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
-import type { Aeropuerto } from '@/types/map.types';
 import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
 import { AnimatedFlightMarker } from './AnimatedFlightMarker';
 import { RoutesLayer } from './RoutesLayer';
-import { FlightDetailsModal } from './FlightDetailsModal';
-import { AirportDetailsModal } from './AirportDetailsModal';
 import { SimulationControlsFloating } from './SimulationControlsFloating';
-import { StatsCard } from './StatsCard';
+import { OccupancyLegend } from './OccupancyLegend';
 
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
@@ -33,8 +30,6 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
 
 export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
   const [timeUnit, setTimeUnit] = useState<TimeUnit>('hours');
-  const [selectedAirport, setSelectedAirport] = useState<Aeropuerto | null>(null);
-  const [selectedFlight, setSelectedFlight] = useState<any | null>(null);
 
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
@@ -57,37 +52,66 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
   const canvasRenderer = useMemo(() => L.canvas(), []);
 
   // Convertir ActiveFlight a formato para AnimatedFlightMarker
+  // Agrupar productos por vuelo para calcular ocupación real
   const flightsForRender = useMemo(() => {
-    const flights = simulation.activeFlights.map(flight => {
-      const origin = airports.find(a => a.id === flight.originAirportId);
-      const dest = airports.find(a => a.id === flight.destinationAirportId);
+    // Agrupar vuelos por flightId para consolidar productos
+    const flightGroups = new Map<number, typeof simulation.activeFlights>();
+    
+    simulation.activeFlights.forEach(flight => {
+      if (!flightGroups.has(flight.flightId)) {
+        flightGroups.set(flight.flightId, []);
+      }
+      flightGroups.get(flight.flightId)!.push(flight);
+    });
+    
+    // Convertir grupos a formato de renderizado
+    const flights = Array.from(flightGroups.entries()).map(([flightId, flightGroup]) => {
+      const firstFlight = flightGroup[0];
+      const origin = airports.find(a => a.id === firstFlight.originAirportId);
+      const dest = airports.find(a => a.id === firstFlight.destinationAirportId);
 
       if (!origin || !dest) {
-        console.warn(`[MapViewTemporal] Vuelo ${flight.flightId} sin aeropuertos: origen=${flight.originAirportId}, destino=${flight.destinationAirportId}`);
+        console.warn(`[MapViewTemporal] Vuelo ${flightId} sin aeropuertos`);
         return null;
       }
 
+      // Recopilar todos los productos y órdenes de este vuelo
+      const productIds = flightGroup.map(f => f.productId);
+      const orderIds = flightGroup.map(f => f.orderId);
+      
+      // Usar capacidad real del vuelo desde el backend
+      const capacityMax = firstFlight.capacityMax;
+      // Usar cantidadProductos del backend (ya viene agrupado correctamente)
+      const capacityUsed = firstFlight.cantidadProductos || productIds.length;
+      
+      // Validación: si no viene capacidad del backend, usar fallback conservador con warning
+      if (!capacityMax) {
+        console.warn(`[MapViewTemporal] Vuelo ${flightId} sin capacidad definida, usando fallback de 100`);
+      }
+      
       return {
-        eventId: `${flight.flightId}-${flight.productId}`,
-        flightId: flight.flightId,
-        flightCode: flight.flightCode,
+        eventId: `flight-${flightId}`,
+        flightId: flightId,
+        flightCode: firstFlight.flightCode,
         originCode: origin.codigoIATA || '',
         destinationCode: dest.codigoIATA || '',
-        departureTime: flight.departureTime,
-        arrivalTime: flight.arrivalTime,
-        currentProgress: flight.progress,
-        productIds: [flight.productId],
-        orderIds: [flight.orderId],
+        departureTime: firstFlight.departureTime,
+        arrivalTime: firstFlight.arrivalTime,
+        currentProgress: firstFlight.progress,
+        productIds,
+        orderIds,
         originLat: origin.latitud,
         originLon: origin.longitud,
         destLat: dest.latitud,
         destLon: dest.longitud,
-        originAirportId: flight.originAirportId,
-        destinationAirportId: flight.destinationAirportId,
+        originAirportId: firstFlight.originAirportId,
+        destinationAirportId: firstFlight.destinationAirportId,
+        capacityMax: capacityMax || 100, // Usar 100 como fallback conservador
+        capacityUsed,
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
     
-    console.log(`[MapViewTemporal] simulation.activeFlights: ${simulation.activeFlights.length}, flightsForRender: ${flights.length}`);
+    console.log(`[MapViewTemporal] Vuelos activos: ${simulation.activeFlights.length} productos en ${flights.length} vuelos`);
     
     return flights;
   }, [simulation.activeFlights, airports]);
@@ -129,10 +153,6 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
     );
   }
 
-  const totalFlights = simulation.flightStats.completed + 
-                      simulation.flightStats.inFlight + 
-                      simulation.flightStats.pending;
-
   return (
     <div className="h-full w-full relative">
       {/* Mapa */}
@@ -147,7 +167,6 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
             <AirportMarker 
               key={airport.id} 
               airport={airport}
-              onClick={() => setSelectedAirport(airport)}
             />
           ))}
         
@@ -175,7 +194,6 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
               key={flight.eventId} 
               flight={flight}
               curvature={CURVATURE}
-              onClick={() => setSelectedFlight(flight)}
             />
           );
         })}
@@ -198,54 +216,8 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
         />
       )}
 
-      {/* Stats cards (bottom) */}
-      {resultado.lineaDeTiempo && (
-        <div className="absolute bottom-6 left-6 right-6 z-[999]">
-          <div className="grid grid-cols-4 gap-3">
-            <StatsCard 
-              label="Tiempo de Simulación"
-              value={simulation.formatSimulationTime(simulation.currentSimTime)}
-            />
-            <StatsCard 
-              label="Vuelos Completados"
-              value={`${simulation.flightStats.completed} / ${totalFlights}`}
-            />
-            <StatsCard 
-              label="Vuelos en Vuelo"
-              value={`${simulation.flightStats.inFlight}`}
-              sublabel={culledFlights.length < flightsForRender.length 
-                ? `(mostrando ${culledFlights.length})` 
-                : undefined}
-            />
-            <StatsCard 
-              label="Vuelos Pendientes"
-              value={`${simulation.flightStats.pending}`}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Modales */}
-      {selectedAirport && (
-        <AirportDetailsModal 
-          airport={selectedAirport}
-          onClose={() => setSelectedAirport(null)}
-        />
-      )}
-      
-      {selectedFlight && (
-        <FlightDetailsModal
-          flight={{
-            ...selectedFlight,
-            status: 'IN_FLIGHT',
-            departureTime: new Date(),
-            arrivalTime: new Date(),
-          }}
-          origin={airports.find(a => a.id === selectedFlight.originAirportId) || null}
-          destination={airports.find(a => a.id === selectedFlight.destinationAirportId) || null}
-          onClose={() => setSelectedFlight(null)}
-        />
-      )}
+      {/* Leyenda de ocupación (bottom-left) */}
+      <OccupancyLegend />
     </div>
   );
 }

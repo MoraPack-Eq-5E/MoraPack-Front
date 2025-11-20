@@ -49,6 +49,8 @@ export interface EventoLineaDeTiempoVueloDTO {
   idAeropuertoOrigen?: number;
   idAeropuertoDestino?: number;
   tiempoTransporteDias?: number;
+  capacidadMaxima?: number; // Capacidad máxima del vuelo
+  cantidadProductos?: number; // Cantidad de productos en este vuelo
 }
 
 export interface LineaDeTiempoSimulacionDTO {
