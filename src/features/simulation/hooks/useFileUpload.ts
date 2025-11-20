@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { importAirports, importFlights, importOrders, importOrdersBatch } from '@/services/dataImport.service';
+import { importAirports, importFlights, importOrders, importOrdersBatch ,importCancellations} from '@/services/dataImport.service';
 import { validateFileSize, validateFileType } from '@/services/fileUpload.service';
 import { SimulationFileType } from '@/types/fileUpload.types';
 import type {
@@ -81,7 +81,8 @@ export function useFileUpload() {
       const newState = { ...prev };
       delete newState[type.toLowerCase() as keyof UploadFilesState];
       // Limpiar validación si se eliminan todos los archivos
-      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)) {
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)
+          && !newState.cancelaciones) {
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
       }
@@ -101,7 +102,8 @@ export function useFileUpload() {
       const newState = { ...prev, pedidos: newPedidos.length > 0 ? newPedidos : undefined };
       
       // Limpiar validación si se eliminan todos los archivos
-      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)) {
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)
+        && !newState.cancelaciones) {
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
       }
@@ -187,7 +189,15 @@ export function useFileUpload() {
           }
         }
       }
-      
+      // 4. Importar cancelaciones (opcional)
+      if (filesState.cancelaciones?.file) {
+        const cancResult = await importCancellations(filesState.cancelaciones.file);
+        if (!cancResult.success) {
+          throw new Error(`Error al importar cancelaciones: ${cancResult.message}`);
+        }
+        results.push(`✓ ${cancResult.count} cancelaciones importadas`);
+        totalCount += cancResult.count || 0;
+      }
       const response: FileUploadValidationResponse = {
         success: true,
         message: results.join('\n'),

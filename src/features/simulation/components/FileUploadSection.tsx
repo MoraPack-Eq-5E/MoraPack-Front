@@ -251,6 +251,13 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
           acceptMultiple={true}
         />
       </div>
+      <FileInputCard
+          title="Cancelaciones (opcional)"
+          description="cancelaciones.txt"
+          file={filesState.cancelaciones?.file}
+          onFileSelect={(file) => addFile(file, SimulationFileType.CANCELACIONES)}
+          onFileRemove={() => removeFile(SimulationFileType.CANCELACIONES)}
+      />
       
       {clientErrors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">

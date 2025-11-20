@@ -5,11 +5,14 @@
 /**
  * Tipo de archivo de simulación
  */
-export enum SimulationFileType {
-  AEROPUERTOS = 'AEROPUERTOS',
-  VUELOS = 'VUELOS',
-  PEDIDOS = 'PEDIDOS',
-}
+export const SimulationFileType = {
+  AEROPUERTOS: 'AEROPUERTOS',
+  VUELOS: 'VUELOS',
+  PEDIDOS: 'PEDIDOS',
+  CANCELACIONES: 'CANCELACIONES'
+} as const;
+
+export type SimulationFileType = typeof SimulationFileType[keyof typeof SimulationFileType];
 
 /**
  * Resultado de validación para un archivo individual
@@ -53,6 +56,8 @@ export interface FileUploadValidationResponse {
   /** Resultado de validación para pedidos.txt */
   pedidos?: FileValidationResult;
   
+  cancelaciones?: FileValidationResult;
+
   /** Mensaje general sobre el resultado */
   message?: string;
   
@@ -87,6 +92,9 @@ export interface UploadFilesState {
   /** Archivos de pedidos (soporta múltiples) */
   pedidos?: UploadedFile[];
   
+  /** Archivo de cancelaciones */
+  cancelaciones?: UploadedFile;
+
   /** ID de sesión después de validación exitosa */
   sessionId?: string;
   
