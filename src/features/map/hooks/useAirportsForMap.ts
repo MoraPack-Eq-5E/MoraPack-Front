@@ -15,13 +15,13 @@ interface AirportBackendResponse {
   longitud: string; // Backend envía formato DMS: "67°09'00\" E"
   capacidadActual: number;
   capacidadMaxima: number;
-  ciudad: {
+  ciudadId?: number;
+  ciudad?: {
     id: number;
     codigo: string;
     nombre: string;
     pais: string;
-    continente: string;
-  };
+  } | null;
   estado: string;
 }
 
@@ -106,6 +106,12 @@ const MAIN_AIRPORTS = new Set(['SPIM', 'UBBB', 'EBCI']);
  */
 function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
   console.log('[adaptAirportForMap] Aeropuerto:', airport.codigoIATA);
+  console.log('[adaptAirportForMap] Datos completos del aeropuerto:', {
+    codigoIATA: airport.codigoIATA,
+    ciudad: airport.ciudad,
+    ciudadNombre: airport.ciudad?.nombre,
+    ciudadPais: airport.ciudad?.pais,
+  });
   console.log('[adaptAirportForMap] Coordenadas RAW del backend:', {
     codigoIATA: airport.codigoIATA,
     latitudRAW: airport.latitud,
@@ -131,12 +137,20 @@ function adaptAirportForMap(airport: AirportBackendResponse): Aeropuerto {
     capMaxAlmacen: airport.capacidadMaxima,
     cantActual: airport.capacidadActual,
     pais: airport.ciudad?.pais || 'Desconocido',
+    ciudad: airport.ciudad?.nombre || 'Desconocido',
     latitud: latitudParsed,
     longitud: longitudParsed,
     // Si el estado es null/undefined, usar DISPONIBLE por defecto
     estado: (airport.estado as 'DISPONIBLE' | 'NO_DISPONIBLE') || 'DISPONIBLE',
     // Marcar si es un aeropuerto principal
     isPrincipal: MAIN_AIRPORTS.has(airport.codigoIATA),
+    // Información completa de la ciudad
+    ciudadInfo: airport.ciudad ? {
+      id: airport.ciudad.id,
+      codigo: airport.ciudad.codigo,
+      nombre: airport.ciudad.nombre,
+      pais: airport.ciudad.pais,
+    } : undefined,
   };
 }
 

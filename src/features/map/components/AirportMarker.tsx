@@ -81,14 +81,11 @@ export function AirportMarker({ airport, onClick, isSelected = false }: AirportM
         : 100;
     
     let status = 'DISPONIBLE';
-    let statusBadgeStyle = 'background: #d1fae5; color: #065f46';
     
     if (porcentajeDisponible < 1) {
         status = 'LLENO';
-        statusBadgeStyle = 'background: #fee2e2; color: #991b1b';
     } else if (porcentajeDisponible < 20) {
         status = 'RESTRINGIDO';
-        statusBadgeStyle = 'background: #fef3c7; color: #92400e';
     }
     
     return (
@@ -102,11 +99,11 @@ export function AirportMarker({ airport, onClick, isSelected = false }: AirportM
         >
             <Popup offset={[0, -10]}>
                 <div style={{minWidth: '220px', fontFamily: 'system-ui, sans-serif'}}>
-                    <div style={{fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '8px'}}>
-                        {airport.ciudad}
+                    {/* Header con ciudad - país en negrita */}
+                    <div style={{fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px', borderBottom: '2px solid #e5e7eb', paddingBottom: '6px'}}>
+                        {airport.ciudadInfo?.nombre || airport.ciudad || 'Desconocido'} - {airport.ciudadInfo?.pais || airport.pais || 'Desconocido'}
                     </div>
                     <div style={{fontSize: '12px', color: '#4b5563', lineHeight: 1.8}}>
-                        <div>Ciudad: {airport.ciudad}, {airport.pais}</div>
                         <div>Código: {airport.codigoIATA}</div>
                         <div>Almacén: {capacidadUsada.toLocaleString()} / {capacidadMaxima.toLocaleString()} unidades</div>
                         <div>Estado: <span style={{
