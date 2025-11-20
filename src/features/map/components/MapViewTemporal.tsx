@@ -210,7 +210,8 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
           currentSimTime={simulation.currentSimTime}
           formatSimulationTime={simulation.formatSimulationTime}
           flightStats={simulation.flightStats}
-          completedProductsCount={simulation.completedProductsCount}
+          completedOrdersCount={simulation.completedOrdersCount}
+          totalOrdersCount={simulation.totalOrdersCount}
           timeUnit={timeUnit}
           onTimeUnitChange={setTimeUnit}
         />

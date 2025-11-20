@@ -29,7 +29,8 @@ interface SimulationControlsFloatingProps {
     inFlight: number;
     pending: number;
   };
-  completedProductsCount: number;
+  completedOrdersCount: number;
+  totalOrdersCount: number;
   
   // Velocidad
   timeUnit: TimeUnit;
@@ -45,7 +46,8 @@ export function SimulationControlsFloating({
   currentSimTime,
   formatSimulationTime,
   flightStats,
-  completedProductsCount,
+  completedOrdersCount,
+  totalOrdersCount,
   timeUnit,
   onTimeUnitChange,
 }: SimulationControlsFloatingProps) {
@@ -138,7 +140,7 @@ export function SimulationControlsFloating({
         <div className="flex justify-between text-gray-700">
           <span className="font-medium">Pedidos entregados:</span>
           <span className="font-semibold text-green-700">
-            {completedProductsCount}
+            {completedOrdersCount}/{totalOrdersCount}
           </span>
         </div>
       </div>
