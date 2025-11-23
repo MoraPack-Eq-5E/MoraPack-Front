@@ -11,11 +11,19 @@ export interface Aeropuerto {
     codigoIATA: string;
     capMaxAlmacen: number;
     cantActual: number;
-    pais: string;
+    pais: string; // Deprecated: usar ciudad.pais
+    ciudad: string; // Deprecated: usar ciudad.nombre
     latitud: number;
     longitud: number;
     estado: 'DISPONIBLE' | 'NO_DISPONIBLE';
     isPrincipal?: boolean; // Indica si es una sede principal de MoraPack
+    // Información completa de la ciudad
+    ciudadInfo?: {
+        id: number;
+        codigo: string;
+        nombre: string;
+        pais: string;
+    };
 }
 
 /**

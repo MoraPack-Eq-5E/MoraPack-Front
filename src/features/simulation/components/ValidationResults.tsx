@@ -5,7 +5,7 @@ interface ValidationResultsProps {
 }
 
 export function ValidationResults({ validationResponse }: ValidationResultsProps) {
-  const { aeropuertos, vuelos, pedidos, message, usingDatabaseFallback } = validationResponse;
+  const { aeropuertos, vuelos, pedidos, cancelaciones, message, usingDatabaseFallback } = validationResponse;
   
   const renderFileResult = (result: FileValidationResult | undefined, label: string) => {
     if (!result) return null;
@@ -105,6 +105,7 @@ export function ValidationResults({ validationResponse }: ValidationResultsProps
         {renderFileResult(aeropuertos, 'Aeropuertos')}
         {renderFileResult(vuelos, 'Vuelos')}
         {renderFileResult(pedidos, 'Pedidos')}
+        {renderFileResult(cancelaciones, 'Cancelaciones')}
       </div>
     </div>
   );

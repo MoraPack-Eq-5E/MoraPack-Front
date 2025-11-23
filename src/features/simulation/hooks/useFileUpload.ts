@@ -83,9 +83,10 @@ export function useFileUpload() {
       // Limpiar validación si se eliminan todos los archivos
       if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)
           && !newState.cancelaciones) {
+
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
-      }
+      } 
       return newState;
     });
     setClientErrors([]);
@@ -194,6 +195,7 @@ export function useFileUpload() {
           }
         }
       }
+
       // 4. Importar cancelaciones (opcional)
       if (filesState.cancelaciones?.file) {
         const cancResult = await importCancellations(filesState.cancelaciones.file);
@@ -201,8 +203,9 @@ export function useFileUpload() {
           throw new Error(`Error al importar cancelaciones: ${cancResult.message}`);
         }
         results.push(`✓ ${cancResult.count} cancelaciones importadas`);
-        totalCount += cancResult.count || 0;
-      }
+        totalCount += cancResult.count || 0;
+      }
+
       const response: FileUploadValidationResponse = {
         success: true,
         message: results.join('\n'),
@@ -242,7 +245,7 @@ export function useFileUpload() {
    * Verifica si hay archivos cargados
    */
   const hasFiles = Boolean(
-    filesState.aeropuertos || filesState.vuelos || (filesState.pedidos && filesState.pedidos.length > 0)
+    filesState.aeropuertos || filesState.vuelos || (filesState.pedidos && filesState.pedidos.length > 0 || filesState.cancelaciones)
   );
   
   /**

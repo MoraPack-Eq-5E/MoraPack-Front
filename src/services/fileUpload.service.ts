@@ -16,7 +16,8 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 export async function validateSimulationFiles(
   aeropuertos?: File,
   vuelos?: File,
-  pedidos?: File
+  pedidos?: File,
+  cancelaciones?: File
 ): Promise<FileUploadValidationResponse> {
   // Crear FormData
   const formData = new FormData();
@@ -32,9 +33,9 @@ export async function validateSimulationFiles(
   if (pedidos) {
     formData.append('pedidos', pedidos);
   }
-  
+  if (cancelaciones) formData.append('cancelaciones', cancelaciones);
   // Si no hay archivos, retornar respuesta simulada
-  if (!aeropuertos && !vuelos && !pedidos) {
+  if (!aeropuertos && !vuelos && !pedidos && !cancelaciones) {
     return {
       success: true,
       message: 'No se proporcionaron archivos. Se usarán los datos de la base de datos.',

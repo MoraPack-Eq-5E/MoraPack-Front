@@ -18,5 +18,3 @@ export * from './EventFeed';
 export * from './AnimatedFlightMarker';
 export * from './AnimatedFlightPath';
 export * from './RoutesLayer';
-export * from './FlightDetailsModal';
-export * from './AirportDetailsModal';

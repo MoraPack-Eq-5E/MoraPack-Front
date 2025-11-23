@@ -144,12 +144,22 @@ export function calculateBearing(
  * Más preciso para curvas Bezier
  * 
  * @param tangent - Vector tangente [dLat, dLng]
- * @returns Ángulo en grados (0-360)
+ * @returns Ángulo en grados para rotación CSS (0° = Norte, sentido horario)
  */
 export function bearingFromTangent(tangent: LatLngTuple): number {
   const [dLat, dLng] = tangent;
-  const angle = Math.atan2(dLng, dLat);
-  return (angle * 180 / Math.PI + 360) % 360;
+  
+  // Calcular el ángulo en radianes
+  // atan2(x, y) para que 0° sea Norte y aumente en sentido horario
+  const angleRad = Math.atan2(dLng, dLat);
+  
+  // Convertir a grados
+  let angleDeg = angleRad * 180 / Math.PI;
+  
+  // Normalizar a 0-360
+  angleDeg = (angleDeg + 360) % 360;
+  
+  return angleDeg;
 }
 
 /**

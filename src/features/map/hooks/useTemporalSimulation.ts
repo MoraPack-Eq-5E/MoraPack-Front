@@ -24,6 +24,8 @@ export interface ActiveFlight {
   departureTime: Date;
   arrivalTime: Date;
   progress: number; // 0-1
+  capacityMax?: number; // Capacidad máxima del vuelo
+  cantidadProductos?: number; // Cantidad de productos en este vuelo
 }
 
 export interface FlightCapacityEvent {
@@ -61,7 +63,7 @@ export function useTemporalSimulation({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSimTime, setCurrentSimTime] = useState(0); // segundos desde inicio
   const [activeFlights, setActiveFlights] = useState<ActiveFlight[]>([]);
-  const [completedProductsCount, setCompletedProductsCount] = useState(0);
+  const [completedOrdersCount, setCompletedOrdersCount] = useState(0);
   const [flightStats, setFlightStats] = useState({
     completed: 0,
     inFlight: 0,
@@ -100,6 +102,22 @@ export function useTemporalSimulation({
     return new Date(simulationStartTime.getTime() + currentSimTime * 1000);
   }, [simulationStartTime, currentSimTime]);
   
+  // Calcular total de pedidos únicos
+  const totalOrdersCount = useMemo(() => {
+    if (!timeline?.eventos || timeline.eventos.length === 0) {
+      return 0;
+    }
+    
+    const uniqueOrderIds = new Set<number>();
+    timeline.eventos.forEach(event => {
+      if (event.idPedido) {
+        uniqueOrderIds.add(event.idPedido);
+      }
+    });
+    
+    return uniqueOrderIds.size;
+  }, [timeline]);
+  
   // Procesar eventos y crear pares DEPARTURE-ARRIVAL
   const flightPairs = useMemo(() => {
     if (!timeline?.eventos || timeline.eventos.length === 0) {
@@ -134,14 +152,14 @@ export function useTemporalSimulation({
   useEffect(() => {
     if (flightPairs.length === 0) {
       setActiveFlights([]);
-      setCompletedProductsCount(0);
+      setCompletedOrdersCount(0);
       setFlightStats({ completed: 0, inFlight: 0, pending: 0 });
       return;
     }
     
     const currentDateTime = new Date(simulationStartTime.getTime() + currentSimTime * 1000);
     const flightsMap = new Map<string, ActiveFlight>();
-    const completedProductIds = new Set<number>();
+    const completedOrderIds = new Set<number>();
     
     let completedCount = 0;
     let pendingCount = 0;
@@ -170,8 +188,8 @@ export function useTemporalSimulation({
       
       if (hasArrived && effectiveArrivalTime) {
         // ✅ Vuelo completado
-        if (departureEvent.idProducto) {
-          completedProductIds.add(departureEvent.idProducto);
+        if (departureEvent.idPedido) {
+          completedOrderIds.add(departureEvent.idPedido);
         }
         completedCount++;
         
@@ -183,9 +201,8 @@ export function useTemporalSimulation({
         ) {
           processedCapacityEventsRef.current.add(`${arrivalKey}-capacity`);
           
-          // Extraer cantidad de productos del flightCode (ej: "VL123 (167 pkgs)" -> 167)
-          const productCountMatch = departureEvent.codigoVuelo?.match(/\((\d+)\s+pkgs?\)/);
-          const totalVolume = productCountMatch ? parseInt(productCountMatch[1]) : 1;
+          // Usar cantidadProductos del DTO
+          const totalVolume = departureEvent.cantidadProductos || 1;
           
           onFlightCapacityChangeRef.current({
             eventType: 'ARRIVAL',
@@ -217,9 +234,8 @@ export function useTemporalSimulation({
         ) {
           processedCapacityEventsRef.current.add(`${departureKey}-capacity`);
           
-          // Extraer cantidad de productos del flightCode (ej: "VL123 (167 pkgs)" -> 167)
-          const productCountMatch = departureEvent.codigoVuelo?.match(/\((\d+)\s+pkgs?\)/);
-          const totalVolume = productCountMatch ? parseInt(productCountMatch[1]) : 1;
+          // Usar cantidadProductos del DTO
+          const totalVolume = departureEvent.cantidadProductos || 1;
           
           onFlightCapacityChangeRef.current({
             eventType: 'DEPARTURE',
@@ -247,6 +263,8 @@ export function useTemporalSimulation({
           departureTime,
           arrivalTime: effectiveArrivalTime,
           progress,
+          capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
+          cantidadProductos: departureEvent.cantidadProductos, // Cantidad de productos
         });
       } else {
         // ⏳ Vuelo pendiente
@@ -303,7 +321,7 @@ export function useTemporalSimulation({
     }
     
     setActiveFlights(activeFlightsList);
-    setCompletedProductsCount(completedProductIds.size);
+    setCompletedOrdersCount(completedOrderIds.size);
     setFlightStats({
       completed: completedCount,
       inFlight: activeFlightsList.length,
@@ -403,7 +421,8 @@ export function useTemporalSimulation({
     currentSimDateTime,
     totalDurationSeconds,
     activeFlights,
-    completedProductsCount,
+    completedOrdersCount,
+    totalOrdersCount,
     flightStats,
     progressPercent,
     

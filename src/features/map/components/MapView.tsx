@@ -12,16 +12,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import { useAirportsForMap } from '@/features/map/hooks';
-import type { SimulationPlayer, ActiveFlightState } from '@/services/simulation-player.service';
+import type { SimulationPlayer } from '@/services/simulation-player.service';
 import type { ResultadoAlgoritmoDTO } from '@/services/algoritmo.service';
 import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
-import type { Aeropuerto } from '@/types/map.types';
 import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
 import { AnimatedFlightMarker } from './AnimatedFlightMarker';
 import { RoutesLayer } from './RoutesLayer';
-import { FlightDetailsModal } from './FlightDetailsModal';
-import { AirportDetailsModal } from './AirportDetailsModal';
 
 interface MapViewProps {
   player: SimulationPlayer;
@@ -42,10 +39,6 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
 export function MapView({ player, resultado }: MapViewProps) {
   const { airports, isLoading: airportsLoading } = useAirportsForMap();
   const [simulationState, setSimulationState] = useState(player.getState());
-  
-  // Estados para modales interactivos
-  const [selectedAirport, setSelectedAirport] = useState<Aeropuerto | null>(null);
-  const [selectedFlight, setSelectedFlight] = useState<ActiveFlightState | null>(null);
 
   // Canvas Renderer para mejor performance con muchas polylines
   const canvasRenderer = useMemo(() => L.canvas(), []);
@@ -121,17 +114,6 @@ export function MapView({ player, resultado }: MapViewProps) {
     player.setSpeed(speed);
   };
 
-  // Handlers para interactividad
-  const handleAirportClick = (airport: Aeropuerto) => {
-    console.log('🏢 Aeropuerto clickeado:', airport.codigoIATA);
-    setSelectedAirport(airport);
-  };
-
-  const handleFlightClick = (flight: ActiveFlightState) => {
-    console.log('✈️ Vuelo clickeado:', flight.flightCode);
-    setSelectedFlight(flight);
-  };
-
   if (airportsLoading) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-50">
@@ -157,7 +139,6 @@ export function MapView({ player, resultado }: MapViewProps) {
             <AirportMarker 
               key={airport.id} 
               airport={airport}
-              onClick={() => handleAirportClick(airport)}
             />
           ))}
         
@@ -186,7 +167,6 @@ export function MapView({ player, resultado }: MapViewProps) {
               key={flight.eventId} 
               flight={flight}
               curvature={CURVATURE}
-              onClick={() => handleFlightClick(flight)}
             />
           );
         })}
@@ -290,19 +270,6 @@ export function MapView({ player, resultado }: MapViewProps) {
           )}
         </div>
       </div>
-
-      {/* Modales interactivos */}
-      <FlightDetailsModal
-        flight={selectedFlight}
-        origin={selectedFlight ? airports.find(a => a.codigoIATA === selectedFlight.originCode) || null : null}
-        destination={selectedFlight ? airports.find(a => a.codigoIATA === selectedFlight.destinationCode) || null : null}
-        onClose={() => setSelectedFlight(null)}
-      />
-
-      <AirportDetailsModal
-        airport={selectedAirport}
-        onClose={() => setSelectedAirport(null)}
-      />
     </div>
   );
 }

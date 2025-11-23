@@ -339,6 +339,17 @@ export function SimulacionPage() {
     fecha.setDate(fecha.getDate() + dias);
     return fecha.toISOString().slice(0, 19);
   }
+
+  function formatearFechaLegible(fechaISO: string): string {
+    const fecha = new Date(fechaISO);
+    return fecha.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: 'long', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
   
   // ==================== RENDER PRINCIPAL ====================
   
@@ -427,6 +438,9 @@ export function SimulacionPage() {
                   />
                   <span>Simulación por colapso (sin límite de tiempo)</span>
                 </label>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Se cargarán pedidos desde <strong>{formatearFechaLegible(config.horaInicioSimulacion!)}</strong> hasta <strong>{formatearFechaLegible(calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!))}</strong>
+                  </p>
               </div>
             </div>
 

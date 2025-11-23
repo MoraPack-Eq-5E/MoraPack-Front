@@ -104,8 +104,8 @@ export function RoutesLayer({
       const end: LatLngTuple = [destination.latitud, destination.longitud];
       const ctrl = computeControlPoint(start, end, curvature);
       
-      // Generar 24 puntos para una curva suave
-      const samples = 24;
+      // Generar 40 puntos para una curva suave (más puntos = línea punteada más suave)
+      const samples = 40;
       const arc: LatLngTuple[] = [];
       
       for (let i = 0; i <= samples; i++) {
@@ -123,7 +123,9 @@ export function RoutesLayer({
 
   // Debug info (solo en desarrollo)
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && flights.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore - NODE_ENV está disponible en tiempo de ejecución
+    if (import.meta.env.DEV && flights.length > 0) {
       console.log(`[RoutesLayer] Renderizando ${routes.length} de ${flights.length} rutas`);
     }
   }, [routes.length, flights.length]);
@@ -140,9 +142,14 @@ export function RoutesLayer({
           <Polyline
             key={route.key}
             positions={route.positions}
-            color="#3b82f6"
-            opacity={opacity}
-            weight={1.5}
+            pathOptions={{
+              color: '#3b82f6',
+              opacity: opacity,
+              weight: 2,
+              dashArray: '10, 8',      // Línea punteada: 10px línea, 8px espacio
+              lineCap: 'round',        // Puntas redondeadas
+              lineJoin: 'round',       // Uniones redondeadas
+            }}
             renderer={canvasRenderer}
             interactive={false} // No interactivo para mejor performance
           />
