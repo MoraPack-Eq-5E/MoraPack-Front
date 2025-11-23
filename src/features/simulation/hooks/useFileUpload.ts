@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { importAirports, importFlights, importOrders, importOrdersBatch ,importCancellations} from '@/services/dataImport.service';
+import { importAirports, importFlights, importOrders, importOrdersBatch ,importCancellations,limpiarDataPrueba} from '@/services/dataImport.service';
 import { validateFileSize, validateFileType } from '@/services/fileUpload.service';
 import { SimulationFileType } from '@/types/fileUpload.types';
 import type {
@@ -127,6 +127,11 @@ export function useFileUpload() {
     setClientErrors([]);
     
     try {
+      // 🧹 LIMPIAR SIEMPRE LA BD AL INICIAR UNA IMPORTACIÓN
+      const clear = await limpiarDataPrueba();
+      if (!clear.success) {
+        throw new Error(`Error limpiando BD: ${clear.message}`);
+      }
       const results: string[] = [];
       let totalCount = 0;
       

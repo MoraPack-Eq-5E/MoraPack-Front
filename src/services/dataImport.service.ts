@@ -315,3 +315,21 @@ export async function getImportStatus(): Promise<Record<string, unknown>> {
   }
 }
 
+export async function limpiarDataPrueba(): Promise<ImportResult> {
+  try {
+    const response = await fetch(`${API_URL}/api/data-import/clear-DataPrueba`, {
+      method: 'DELETE',
+    });
+
+    const result: ImportResult = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Error limpiando base de datos');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error limpiando base de datos:', error);
+    throw error;
+  }
+}

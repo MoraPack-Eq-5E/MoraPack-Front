@@ -734,21 +734,22 @@ export function SimulacionPage() {
                 {resultadoAlgoritmo?.lineaDeTiempo && !airportsLoading ? (
                   <MapViewTemporal
                     resultado={
-                      modoSimulacion === 'SEMANAL'
-                        ? (resultadoAlgoritmo as AlgoritmoResponse)
-                        : ({
-                            exito: true,
-                            mensaje: `Simulación de colapso: ${(resultadoAlgoritmo as ResultadoColapsoDTO).tipoColapso}`,
-                            lineaDeTiempo: (resultadoAlgoritmo as ResultadoColapsoDTO).lineaDeTiempo,
-                            tiempoInicioEjecucion: new Date().toISOString(),
-                            tiempoFinEjecucion: new Date(Date.now() + ((resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0) * 1000).toISOString(),
-                            tiempoEjecucionSegundos: (resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0,
-                            totalProductos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                            totalPedidos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosTotales,
-                            productosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                            pedidosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                            costoTotal: 0,
-                          } as AlgoritmoResponse)
+                      resultadoAlgoritmo as AlgoritmoResponse
+                      // modoSimulacion === 'SEMANAL'
+                      //   ? (resultadoAlgoritmo as AlgoritmoResponse)
+                      //   : ({
+                      //       exito: true,
+                      //       mensaje: `Simulación de colapso: ${(resultadoAlgoritmo as ResultadoColapsoDTO).tipoColapso}`,
+                      //       lineaDeTiempo: (resultadoAlgoritmo as ResultadoColapsoDTO).lineaDeTiempo,
+                      //       tiempoInicioEjecucion: new Date().toISOString(),
+                      //       tiempoFinEjecucion: new Date(Date.now() + ((resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0) * 1000).toISOString(),
+                      //       tiempoEjecucionSegundos: (resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0,
+                      //       totalProductos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                      //       totalPedidos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosTotales,
+                      //       productosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                      //       pedidosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
+                      //       costoTotal: 0,
+                      //     } as AlgoritmoResponse)
                     }
                   />
                 ) : (
