@@ -1,204 +1,145 @@
 /**
- * EnVivoPage – con Modo Automático
- *
- * Simulación en tiempo real usando /api/algoritmo/diario
- * Flujo:
- * 1. Cargar pedidos
- * 2. Ejecutar ventanas manual o automáticamente
- * 3. Mostrar resultados por ventana
+ * EnVivoPage — versión compacta
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import { MapViewTemporal } from '@/features/map/components';
-import { ejecutarAlgoritmoDiario } from '@/services/algoritmoSemanal.service';
-import { useAirportsForMap } from '@/features/map/hooks';
+import { useState, useEffect, useRef } from "react";
+import { ejecutarAlgoritmoDiario } from "@/services/algoritmoSemanal.service";
+import { MapViewDiaADia } from "@/features/map/components/MapViewDiaADiaProps";
+import { useAirportsForMap } from "@/features/map/hooks";
 
 export function EnVivoPage() {
 
-  const [dataCargada, setDataCargada] = useState(false);
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  const toLocalIso = (date: Date) => {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+      date.getSeconds()
+    )}`;
+  };
+
+  const [horaSimulada, setHoraSimulada] = useState(() =>
+    toLocalIso(new Date())
+  );
+
   const [isRunning, setIsRunning] = useState(false);
   const [resultadoVentana, setResultadoVentana] = useState<any | null>(null);
-  
-  // --------------------------------------
-  // FORMATEAR FECHA A LOCAL yyyy-MM-ddTHH:mm:ss
-  // --------------------------------------
-  function toLocalIsoNoZ(date: Date) {
-    const pad = (n: number) => String(n).padStart(2, "0");
+  //const { airports, isLoading: airportsLoading } = useAirportsForMap();
 
-    const y = date.getFullYear();
-    const m = pad(date.getMonth() + 1);
-    const d = pad(date.getDate());
-    const h = pad(date.getHours());     // <-- hora local REAL
-    const min = pad(date.getMinutes());
-    const s = pad(date.getSeconds());
-
-    return `${y}-${m}-${d}T${h}:${min}:${s}`;
-  }
-
-  // --------------------------------------
-  // HORA INICIAL = HORA LOCAL REAL DEL SISTEMA
-  // --------------------------------------
-  const [horaActual, setHoraActual] = useState(() => {
-    const now = new Date();
-    return toLocalIsoNoZ(now);
-  });
-
-  const { airports, isLoading: airportsLoading } = useAirportsForMap();
-
-  // ===========================
-  // AUTOMÁTICO
-  // ===========================
   const [autoRun, setAutoRun] = useState(false);
-  const [intervaloMs, setIntervaloMs] = useState(5000); // 5s por defecto
+  const [intervaloMs, setIntervaloMs] = useState(6000);
 
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
 
-  const ejecutarReferencia = useRef<() => Promise<void>>(async () => {});
+  const ejecutarRef = useRef<() => Promise<void>>(async () => {});
 
-  // ===========================
-  // 1) Carga de datos
-  // ===========================
-  const handleFileImportSuccess = async () => {
-    console.log("Archivos importados.");
-    setDataCargada(true);
-  };
-
-  // ===========================
-  // 2) Ejecutar una ventana
-  // ===========================
+  const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
+  // -------------------------------
+  // Ejecutar ventana de 1h
+  // -------------------------------
   const ejecutarVentana = async () => {
     if (isRunning) return;
 
     setIsRunning(true);
+    await refetchAirports();
 
     const request = {
-      horaInicioSimulacion: horaActual,
+      horaInicioSimulacion: horaSimulada,
       duracionSimulacionHoras: 1,
       usarBaseDatos: true,
       maxIteraciones: 800,
       tasaDestruccion: 0.3,
-      habilitarUnitizacion: true
+      habilitarUnitizacion: true,
     };
 
     try {
-      const resultado = await ejecutarAlgoritmoDiario(request);
-      setResultadoVentana(resultado);
+      const res = await ejecutarAlgoritmoDiario(request);
+      setResultadoVentana(res);
 
-      // Avanzar la hora actual
-      const inicio = new Date(horaActual);
-      inicio.setHours(inicio.getHours() + 1);
-      setHoraActual(toLocalIsoNoZ(inicio));
-    } catch (e) {
-      console.error("Error ejecutando ventana:", e);
-      setAutoRun(false); // detener automático al fallar
+      const t = new Date(horaSimulada);
+      t.setHours(t.getHours() + 1);
+      setHoraSimulada(toLocalIso(t));
+    } catch (err) {
+      console.error("Error ejecutando ventana:", err);
+      setAutoRun(false);
     }
 
     setIsRunning(false);
   };
 
-  // Guardar referencia de ejecutarVentana
-  ejecutarReferencia.current = ejecutarVentana;
+  ejecutarRef.current = ejecutarVentana;
 
-  // ===========================
-  // Mecanismo del modo automático
-  // ===========================
+  // -------------------------------
+  // Auto-run
+  // -------------------------------
   useEffect(() => {
     if (!autoRun) return;
 
-    const interval = setInterval(() => {
-      // Evitar múltiples ejecuciones simultáneas
-      if (!isRunning && autoRunRef.current) {
-        ejecutarReferencia.current();
-      }
+    const timer = setInterval(() => {
+      if (!isRunning && autoRunRef.current) ejecutarRef.current();
     }, intervaloMs);
 
-    return () => clearInterval(interval);
+    return () => clearInterval(timer);
   }, [autoRun, intervaloMs, isRunning]);
 
-  // ======================================================
-  // FRONT
-  // ======================================================
+  // -------------------------------
+  // UI
+  // -------------------------------
   return (
-    <div className="h-full flex flex-col p-6">
+    <div className="h-full flex flex-col p-3">
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">
-        🔴 Simulación En Vivo
+      {/* Header compactado */}
+      <h1 className="text-xl font-semibold text-gray-900 mb-2">
+        🔴 En Vivo — Operación Día a Día
       </h1>
 
-      {/* Paso 1: cargar datos */}
-      {!dataCargada && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">1. Cargar pedidos</h2>
-          <p className="text-gray-600 mb-3">
-            Sube archivos de pedidos para operar en tiempo real.
-          </p>
+      {/* Controles compactos */}
+      <div className="mb-3 bg-white border rounded-lg p-3 flex items-center gap-4">
 
-          <FileUploadSection
-            onValidationSuccess={handleFileImportSuccess}
-            modoSimulacion="SEMANAL"
-            horaInicio={horaActual}
-            horaFin={horaActual}
+        <button
+          onClick={ejecutarVentana}
+          disabled={isRunning || autoRun}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-blue-300"
+        >
+          {isRunning ? "Procesando..." : "Siguiente ventana →"}
+        </button>
+
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={autoRun}
+            onChange={(e) => setAutoRun(e.target.checked)}
           />
-        </div>
-      )}
+          Automático
+        </label>
 
-      {/* Paso 2: ejecución */}
-      {dataCargada && (
-        <>
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-2">2. Operaciones en tiempo real</h2>
+        {autoRun && (
+          <input
+            type="number"
+            value={intervaloMs}
+            min={1000}
+            onChange={(e) => setIntervaloMs(Number(e.target.value))}
+            className="border p-1 rounded w-24 text-sm"
+          />
+        )}
 
-            <div className="flex items-center gap-4 mb-4">
-              <button
-                onClick={ejecutarVentana}
-                disabled={isRunning || autoRun}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
-              >
-                {isRunning ? "Procesando..." : "Procesar siguiente ventana ➜"}
-              </button>
+        <span className="text-sm text-gray-600 ml-auto">
+          ⏱ Hora simulada: <strong>{horaSimulada}</strong>
+        </span>
+      </div>
 
-              {/* AUTO MODE */}
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={autoRun}
-                  onChange={(e) => setAutoRun(e.target.checked)}
-                />
-                <span className="text-gray-700">Automático</span>
-              </label>
-
-              {autoRun && (
-                <input
-                  type="number"
-                  value={intervaloMs}
-                  onChange={(e) => setIntervaloMs(Number(e.target.value))}
-                  className="border p-2 rounded w-32"
-                  min={1000}
-                />
-              )}
-            </div>
-
-            <p className="mt-3 text-sm text-gray-500">
-              Hora actual de simulación: <strong>{horaActual}</strong>
-            </p>
+      {/* Mapa más grande */}
+      <div className="flex-1 border rounded-xl overflow-hidden">
+        {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
+          <MapViewDiaADia resultado={resultadoVentana} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+            {airportsLoading ? "Cargando aeropuertos..." : "Sin ventanas procesadas todavía."}
           </div>
-
-          {/* Mapa */}
-          <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
-            {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
-              <MapViewTemporal resultado={resultadoVentana} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                {airportsLoading
-                  ? "Cargando aeropuertos..."
-                  : "Aún no hay ventanas procesadas."}
-              </div>
-            )}
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
