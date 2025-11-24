@@ -9,17 +9,16 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
 import { MapViewTemporal } from '@/features/map/components';
-import { ejecutarAlgoritmoDiario } from '@/services/algoritmoSemanal.service';
+import { ejecutarAlgoritmoDiario, type AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
 import { useAirportsForMap } from '@/features/map/hooks';
 
 export function EnVivoPage() {
 
   const [dataCargada, setDataCargada] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [resultadoVentana, setResultadoVentana] = useState<any | null>(null);
-  
+  const [resultadoVentana, setResultadoVentana] = useState<AlgoritmoResponse | null>(null);
+
   // --------------------------------------
   // FORMATEAR FECHA A LOCAL yyyy-MM-ddTHH:mm:ss
   // --------------------------------------
@@ -44,13 +43,15 @@ export function EnVivoPage() {
     return toLocalIsoNoZ(now);
   });
 
-  const { airports, isLoading: airportsLoading } = useAirportsForMap();
+  // Obtener estado de carga y refetch para forzar carga desde BD (useAirportsForMap está configurado con enabled: false)
+  const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
 
   // ===========================
   // AUTOMÁTICO
   // ===========================
   const [autoRun, setAutoRun] = useState(false);
-  const [intervaloMs, setIntervaloMs] = useState(5000); // 5s por defecto
+  // Intervalo por defecto en tiempo real: 60s
+  const [intervaloMs, setIntervaloMs] = useState(60000); // 60s por defecto
 
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
@@ -60,10 +61,8 @@ export function EnVivoPage() {
   // ===========================
   // 1) Carga de datos
   // ===========================
-  const handleFileImportSuccess = async () => {
-    console.log("Archivos importados.");
-    setDataCargada(true);
-  };
+  // Nota: ya no usamos una sección de carga de archivos en esta vista; iniciamos
+  // la operación día a día con el botón único.
 
   // ===========================
   // 2) Ejecutar una ventana
@@ -86,6 +85,13 @@ export function EnVivoPage() {
       const resultado = await ejecutarAlgoritmoDiario(request);
       setResultadoVentana(resultado);
 
+      // Refrescar aeropuertos tras recibir resultado para asegurar datos actualizados
+      try {
+        await refetchAirports();
+      } catch (e) {
+        console.warn('No se pudieron refrescar aeropuertos tras ejecutar ventana:', e);
+      }
+
       // Avanzar la hora actual
       const inicio = new Date(horaActual);
       inicio.setHours(inicio.getHours() + 1);
@@ -100,6 +106,27 @@ export function EnVivoPage() {
 
   // Guardar referencia de ejecutarVentana
   ejecutarReferencia.current = ejecutarVentana;
+
+  // Iniciar operación día a día: marcar datos cargados, activar autoRun, refetch aeropuertos y ejecutar una ventana inmediata
+  const iniciarOperacionDiaria = async () => {
+    setDataCargada(true);
+    setAutoRun(true);
+    // Refrescar aeropuertos desde la BD para que el mapa pueda mostrarlos
+    try {
+      await refetchAirports();
+    } catch (e) {
+      console.warn('Advertencia: no se pudieron cargar los aeropuertos antes de iniciar la operación:', e);
+    }
+
+    // Ejecutar inmediatamente la primera ventana
+    try {
+      await ejecutarReferencia.current();
+    } catch (e) {
+      // En caso de error, detener autoRun
+      console.error('Error iniciando operación día a día:', e);
+      setAutoRun(false);
+    }
+  };
 
   // ===========================
   // Mecanismo del modo automático
@@ -127,20 +154,18 @@ export function EnVivoPage() {
         🔴 Simulación En Vivo
       </h1>
 
-      {/* Paso 1: cargar datos */}
+      {/* Paso 1: iniciar Operación día a día */}
       {!dataCargada && (
         <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">1. Cargar pedidos</h2>
-          <p className="text-gray-600 mb-3">
-            Sube archivos de pedidos para operar en tiempo real.
-          </p>
+          <h2 className="text-xl font-semibold mb-2">1. Ejecutar Operación día a día</h2>
+          <p className="text-gray-600 mb-3">Inicia la operación día a día y ejecuta el algoritmo automáticamente.</p>
 
-          <FileUploadSection
-            onValidationSuccess={handleFileImportSuccess}
-            modoSimulacion="SEMANAL"
-            horaInicio={horaActual}
-            horaFin={horaActual}
-          />
+          <button
+            onClick={iniciarOperacionDiaria}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+          >
+            Ejecutar Operación día a día
+          </button>
         </div>
       )}
 
@@ -188,7 +213,7 @@ export function EnVivoPage() {
           {/* Mapa */}
           <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
             {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
-              <MapViewTemporal resultado={resultadoVentana} />
+              <MapViewTemporal resultado={resultadoVentana} initialTimeUnit="seconds" autoPlay />
             ) : (
               <div className="h-full flex items-center justify-center text-gray-500">
                 {airportsLoading

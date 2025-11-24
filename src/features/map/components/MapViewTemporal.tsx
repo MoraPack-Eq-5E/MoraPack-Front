@@ -4,10 +4,9 @@
  * Versión mejorada de MapView que usa useTemporalSimulation
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import L from 'leaflet';
-import { useTemporalSimulation, type TimeUnit } from '../hooks/useTemporalSimulation';
-import { useAirportCapacityManager } from '../hooks/useAirportCapacityManager';
+import { useTemporalSimulation, useAirportCapacityManager, type TimeUnit } from '../hooks';
 import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
 import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
@@ -18,6 +17,10 @@ import { OccupancyLegend } from './OccupancyLegend';
 
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
+  // Opcional: unidad de tiempo inicial (por defecto mantiene 'hours' para páginas semanales)
+  initialTimeUnit?: TimeUnit;
+  // Opcional: iniciar reproducción automáticamente
+  autoPlay?: boolean;
 }
 
 // Constantes
@@ -28,8 +31,8 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
   return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
 }
 
-export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
-  const [timeUnit, setTimeUnit] = useState<TimeUnit>('hours');
+export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay }: MapViewTemporalProps) {
+  const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ?? 'hours');
 
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
@@ -41,6 +44,15 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
     timeUnit,
     onFlightCapacityChange: capacityManager.handleFlightCapacityEvent,
   });
+
+  // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
+  // Iniciamos la reproducción cuando haya timeline y autoPlay esté activado
+  useEffect(() => {
+    if (autoPlay && resultado.lineaDeTiempo) {
+      simulation.play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, resultado.lineaDeTiempo]);
 
   // Envolver reset para también resetear capacidades
   const handleReset = () => {
@@ -114,7 +126,7 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
     console.log(`[MapViewTemporal] Vuelos activos: ${simulation.activeFlights.length} productos en ${flights.length} vuelos`);
     
     return flights;
-  }, [simulation.activeFlights, airports]);
+  }, [simulation, airports]);
 
   // Culling de vuelos
   const culledFlights = useMemo(() => {
@@ -222,4 +234,3 @@ export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
     </div>
   );
 }
-
