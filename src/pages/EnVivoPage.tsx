@@ -110,7 +110,7 @@ export function EnVivoPage() {
   // Iniciar operación día a día: marcar datos cargados, activar autoRun, refetch aeropuertos y ejecutar una ventana inmediata
   const iniciarOperacionDiaria = async () => {
     setDataCargada(true);
-    setAutoRun(true);
+    setAutoRun(false);
     // Refrescar aeropuertos desde la BD para que el mapa pueda mostrarlos
     try {
       await refetchAirports();
