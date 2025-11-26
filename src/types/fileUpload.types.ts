@@ -5,12 +5,14 @@
 /**
  * Tipo de archivo de simulación
  */
-export enum SimulationFileType {
-  AEROPUERTOS = 'AEROPUERTOS',
-  VUELOS = 'VUELOS',
-  PEDIDOS = 'PEDIDOS',
-  CANCELACIONES = 'CANCELACIONES',
-}
+export const SimulationFileType = {
+  AEROPUERTOS: 'AEROPUERTOS',
+  VUELOS: 'VUELOS',
+  PEDIDOS: 'PEDIDOS',
+  CANCELACIONES: 'CANCELACIONES',
+} as const;
+
+export type SimulationFileType = typeof SimulationFileType[keyof typeof SimulationFileType];
 
 /**
  * Resultado de validación para un archivo individual
