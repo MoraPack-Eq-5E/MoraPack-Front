@@ -131,7 +131,7 @@ export function AnimatedFlightMarker({
       const distLat = Math.abs(lat - lastUpdateRef.current.lat);
       const distLng = Math.abs(lng - lastUpdateRef.current.lng);
       const distProgress = Math.abs(flight.currentProgress - lastUpdateRef.current.progress);
-
+      
       // Si el cambio es muy pequeño, skip (umbrales reducidos)
       if (distLat < 0.0001 && distLng < 0.0001 && distProgress < 0.005) {
         return;

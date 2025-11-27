@@ -28,12 +28,28 @@ export interface VueloSimpleDTO {
   horaLlegada: string;
   tiempoTransporte: number;
   costo: number;
+  horaSalidaReal?: string;  // ISO datetime - fecha+hora exacta de salida
+  horaLlegadaReal?: string; // ISO datetime - fecha+hora exacta de llegada
 }
 
 export interface RutaProductoDTO {
   idProducto: number;
   idPedido: number;
+  fechaPedido?: string;
+  nombrePedido?: string;
+  nombreProducto?: string;
+  peso?: number;
+  volumen?: number;
+  codigoOrigen?: string;
+  codigoDestino?: string;
   vuelos: VueloSimpleDTO[];
+  cantidadVuelos?: number;
+  tiempoTotalHoras?: number;
+  estado?: string;
+  // NUEVOS: Información temporal calculada por ALNS
+  horaEntregaEstimada?: string; // ISO datetime - hora de llegada al destino final
+  llegoATiempo?: boolean;       // true si llega antes del deadline
+  margenHoras?: number;         // Horas de margen (positivo=a tiempo, negativo=tarde)
 }
 
 export interface EventoLineaDeTiempoVueloDTO {
@@ -43,9 +59,13 @@ export interface EventoLineaDeTiempoVueloDTO {
   idVuelo?: number;
   codigoVuelo?: string;
   idProducto?: number;
-  idPedido?: number;
+  idPedido?: number; // Para compatibilidad (primer pedido del grupo)
+  idsPedidos?: number[]; // ← TODOS los pedidos en este vuelo agrupado
   ciudadOrigen?: string;
   ciudadDestino?: string;
+  codigoIATAOrigen?: string;  // Código IATA del aeropuerto origen
+  codigoIATADestino?: string; // Código IATA del aeropuerto destino
+  esDestinoFinal?: boolean;   // true si este vuelo llega al destino FINAL del pedido
   idAeropuertoOrigen?: number;
   idAeropuertoDestino?: number;
   tiempoTransporteDias?: number;
@@ -62,6 +82,7 @@ export interface LineaDeTiempoSimulacionDTO {
   totalProductos?: number;
   totalVuelos?: number;
   totalAeropuertos?: number;
+  rutasProductos?: RutaProductoDTO[]; // Rutas para determinar destino final de cada pedido
 }
 
 export interface ResultadoAlgoritmoDTO {
@@ -119,9 +140,36 @@ export async function obtenerRutas(): Promise<RutaDTO[]> {
 }
 
 /**
+ * Interfaz para soluciones guardadas
+ */
+export interface SolucionDTO {
+  id?: number;
+  nombre?: string;
+  fechaCreacion?: string;
+  costoTotal?: number;
+  totalProductos?: number;
+  totalPedidos?: number;
+  rutas?: RutaDTO[];
+}
+
+/**
+ * DTO para aeropuerto con información de almacén
+ * Usado para tracking de capacidad en simulación frontend
+ */
+export interface AeropuertoAlmacenDTO {
+  id: number;
+  codigoIATA: string;
+  nombre?: string;
+  latitud: number;
+  longitud: number;
+  capacidadActual: number;  // Estado inicial del almacén (productos)
+  capacidadMaxima: number;  // Capacidad máxima del almacén
+}
+
+/**
  * Obtiene soluciones guardadas
  */
-export async function obtenerSoluciones(): Promise<any[]> {
+export async function obtenerSoluciones(): Promise<SolucionDTO[]> {
   const response = await fetch(`${API_BASE}/api/soluciones`);
 
   if (!response.ok) {
