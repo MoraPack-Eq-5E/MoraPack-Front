@@ -29,7 +29,7 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
 }
 
 export function MapViewTemporal({ resultado }: MapViewTemporalProps) {
-  const [timeUnit, setTimeUnit] = useState<TimeUnit>('hours');
+  const [timeUnit, setTimeUnit] = useState<TimeUnit>('days'); // ✅ Cambiado a 'days' para simulaciones largas
 
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();

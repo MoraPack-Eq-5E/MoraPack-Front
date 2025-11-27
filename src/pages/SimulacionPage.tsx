@@ -144,11 +144,33 @@ export function SimulacionPage() {
       
       setResultadoAlgoritmo(resultado);
       
-      console.log('✅ Algoritmo completado:', {
-        productosAsignados: resultado.totalProductos,
-        costoTotal: resultado.costoTotal,
-        segundosEjecucion: resultado.tiempoEjecucionSegundos,
-      });
+      // ✅ LOG COMPLETO DEL RESULTADO
+      console.log('═══════════════════════════════════════════════════');
+      console.log('✅ RESULTADO COMPLETO DEL ALGORITMO SEMANAL:');
+      console.log('═══════════════════════════════════════════════════');
+      console.log('📦 Total productos:', resultado.totalProductos);
+      console.log('📋 Total pedidos:', resultado.totalPedidos);
+      console.log('💰 Costo total:', resultado.costoTotal);
+      console.log('⏱️ Tiempo ejecución:', resultado.tiempoEjecucionSegundos, 'segundos');
+      console.log('');
+      console.log('⏰ TIMELINE:');
+      if (resultado.lineaDeTiempo) {
+        console.log('  - Hora inicio:', resultado.lineaDeTiempo.horaInicioSimulacion);
+        console.log('  - Hora fin:', resultado.lineaDeTiempo.horaFinSimulacion);
+        console.log('  - Duración (minutos):', resultado.lineaDeTiempo.duracionTotalMinutos || 0);
+        console.log('  - Duración (días):', ((resultado.lineaDeTiempo.duracionTotalMinutos || 0) / 60 / 24).toFixed(2));
+        console.log('  - Total eventos:', resultado.lineaDeTiempo.totalEventos);
+        console.log('  - Total vuelos únicos:', resultado.lineaDeTiempo.totalVuelos);
+      } else {
+        console.log('  ⚠️ NO HAY TIMELINE');
+      }
+      console.log('═══════════════════════════════════════════════════');
+      console.log('OBJETO COMPLETO:', resultado);
+      console.log('═══════════════════════════════════════════════════');
+      
+      // 🔍 Guardar en variable global para consulta sin re-ejecutar
+      (window as any).ultimoResultadoSemanal = resultado;
+      console.log('💾 Resultado guardado en: window.ultimoResultadoSemanal');
       
       // Esperar un momento para que se persistan los datos
       await new Promise(resolve => setTimeout(resolve, 1000));
