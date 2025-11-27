@@ -66,16 +66,15 @@ export function AnimatedFlightMarker({
                                        flight,
                                        curvature = 0.25
                                      }: AnimatedFlightMarkerProps) {
+  // Validar coordenadas (permitir 0) - retornar temprano antes de llamar Hooks para respetar reglas de Hooks
+  const hasValidCoords = !(flight.originLat == null || flight.originLon == null || flight.destLat == null || flight.destLon == null);
+  if (!hasValidCoords) return null;
+
   const map = useMap();
   const markerRef = useRef<LeafletMarker | null>(null);
   const lastUpdateRef = useRef<{ progress: number; lat: number; lng: number } | null>(null);
 
-  // Validar coordenadas
-  if (!flight.originLat || !flight.originLon || !flight.destLat || !flight.destLon) {
-    return null;
-  }
-
-  // Precalcular puntos de la curva Bezier
+  // Precalcular puntos de la curva Bezier (si no hay coords válidas, devolver null)
   const bezierData = useMemo(() => {
     const start: LatLngTuple = [flight.originLat!, flight.originLon!];
     const end: LatLngTuple = [flight.destLat!, flight.destLon!];
@@ -87,14 +86,9 @@ export function AnimatedFlightMarker({
   // Color basado en porcentaje de ocupación de la capacidad del avión
   const color = useMemo(() => {
     const capacityMax = flight.capacityMax || 300; // Capacidad estándar por defecto
-    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const capacityUsed = flight.capacityUsed ?? (flight.productIds ? flight.productIds.length : 0);
     const occupancyPercent = (capacityUsed / capacityMax) * 100;
 
-    // Colores según imagen:
-    // Verde oscuro: < 70% (Moderada)
-    // Amarillo: 70-85% (Alta)
-    // Naranja: 85-95% (Muy alta)
-    // Rojo: > 95% (Casi lleno)
     if (occupancyPercent < 70) {
       return '#059669'; // Verde oscuro (green-600)
     } else if (occupancyPercent < 85) {
@@ -104,10 +98,11 @@ export function AnimatedFlightMarker({
     } else {
       return '#ef4444'; // Rojo (red-500)
     }
-  }, [flight.capacityMax, flight.capacityUsed, flight.productIds.length]);
+  }, [flight.capacityMax, flight.capacityUsed, flight.productIds]);
 
   // Calcular posición y rotación en la curva Bezier
   const currentState = useMemo(() => {
+    if (!bezierData) return null;
     const { start, ctrl, end } = bezierData;
     const progress = Math.max(0, Math.min(1, flight.currentProgress));
 
@@ -121,17 +116,17 @@ export function AnimatedFlightMarker({
   // Crear/actualizar marker con Leaflet nativo para mejor performance
   useEffect(() => {
     if (!map) return;
+    if (!currentState) return; // No hay coords válidas
 
     const { position, bearing } = currentState;
     const [lat, lng] = position;
 
     // Throttle: solo actualizar si cambió significativamente
-    // Reducido para mejor sincronización con zoom
     if (lastUpdateRef.current) {
       const distLat = Math.abs(lat - lastUpdateRef.current.lat);
       const distLng = Math.abs(lng - lastUpdateRef.current.lng);
       const distProgress = Math.abs(flight.currentProgress - lastUpdateRef.current.progress);
-      
+
       // Si el cambio es muy pequeño, skip (umbrales reducidos)
       if (distLat < 0.0001 && distLng < 0.0001 && distProgress < 0.005) {
         return;
@@ -150,7 +145,7 @@ export function AnimatedFlightMarker({
       });
 
       // Usar capacityUsed directamente del objeto flight
-      const capacityUsed = flight.capacityUsed || flight.productIds.length;
+      const capacityUsed = flight.capacityUsed ?? (flight.productIds ? flight.productIds.length : 0);
       const capacityMax = flight.capacityMax || 360;
       const progressPercent = Math.round(flight.currentProgress * 100);
 
@@ -175,17 +170,35 @@ export function AnimatedFlightMarker({
       marker.addTo(map);
       markerRef.current = marker;
     } else {
-      // Actualizar posición e icono
+      // Actualizar posición
       markerRef.current.setLatLng([lat, lng]);
-      markerRef.current.setIcon(createPlaneIcon(bearing, color));
+
+      // Evitar recrear el icono (provoca parpadeo). Actualizar DOM interno del DivIcon.
+      try {
+        const el = (markerRef.current.getElement && markerRef.current.getElement()) as HTMLElement | null;
+        if (el) {
+          const svg = el.querySelector('svg');
+          if (svg) {
+            // rotation offset igual que en createPlaneIcon
+            const rotation = bearing - 45;
+            (svg as unknown as HTMLElement).style.transform = `rotate(${rotation}deg)`;
+            (svg as unknown as HTMLElement).style.transformOrigin = 'center center';
+
+            const path = svg.querySelector('path');
+            if (path) {
+              path.setAttribute('fill', color);
+            }
+          }
+        }
+      } catch {
+        // Si algo falla, como fallback, reemplazamos el icono (menos frecuente)
+        markerRef.current.setIcon(createPlaneIcon(bearing, color));
+      }
     }
 
-    return () => {
-      if (markerRef.current) {
-        map.removeLayer(markerRef.current);
-        markerRef.current = null;
-      }
-    };
+    // NOTA: no removemos el marker en el cleanup de este efecto para evitar que
+    // se destruya/recree constantemente (provoca parpadeo y pérdida del popup abierto).
+
   }, [map, currentState, color, flight]);
 
   // Cleanup al desmontar
