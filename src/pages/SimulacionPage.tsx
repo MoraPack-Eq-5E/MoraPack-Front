@@ -40,7 +40,7 @@ export function SimulacionPage() {
   const [error, setError] = useState<string | null>(null);
   
   // Hook para obtener aeropuertos
-  const { airports, isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
+  const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
   
   // Configuración del algoritmo semanal (simplificada)
   const [config, setConfig] = useState<AlgoritmoRequest>({
@@ -850,3 +850,6 @@ function StepIndicator({ number, title, isActive, isCompleted }: StepIndicatorPr
     </div>
   );
 }
+
+// Export default para lazy loading
+export default SimulacionPage;

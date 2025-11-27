@@ -45,7 +45,6 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
         transform-origin: center center;
         will-change: transform;
         filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-        transition: transform 0.2s ease-out;
       "
     >
       <path d="M119.7,18.2c7.8-7.8-3-17.9-10.7-10.3L80.7,36.3L15.8,19.2L5,30l53.5,28.2L36.8,79.8L20,77.7l-8.6,8.6l19.1,10l10,19.1l8.6-8.6l-2-16.7l21.6-21.6l27.6,53.2l10.8-10.8L90.8,47.2L119.7,18.2z" fill="${color}"/>
@@ -127,13 +126,14 @@ export function AnimatedFlightMarker({
     const [lat, lng] = position;
 
     // Throttle: solo actualizar si cambió significativamente
+    // Reducido para mejor sincronización con zoom
     if (lastUpdateRef.current) {
       const distLat = Math.abs(lat - lastUpdateRef.current.lat);
       const distLng = Math.abs(lng - lastUpdateRef.current.lng);
       const distProgress = Math.abs(flight.currentProgress - lastUpdateRef.current.progress);
       
-      // Si el cambio es muy pequeño, skip
-      if (distLat < 0.001 && distLng < 0.001 && distProgress < 0.01) {
+      // Si el cambio es muy pequeño, skip (umbrales reducidos)
+      if (distLat < 0.0001 && distLng < 0.0001 && distProgress < 0.005) {
         return;
       }
     }

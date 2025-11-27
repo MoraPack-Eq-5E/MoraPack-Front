@@ -1,11 +1,11 @@
 /**
  * En Vivo Route
  * Ruta del mapa en modo "en vivo" dentro del layout autenticado
+ * Con lazy loading para optimizar el bundle inicial
  */
 
-import { createFileRoute } from '@tanstack/react-router';
-import { EnVivoPage } from '@/pages';
+import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authenticated/en-vivo')({
-  component: EnVivoPage,
+  component: lazyRouteComponent(() => import('@/pages/EnVivoPage')),
 });

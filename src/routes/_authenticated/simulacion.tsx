@@ -3,9 +3,8 @@
  * Ruta del mapa en modo "simulación" dentro del layout autenticado
  */
 
-import { createFileRoute } from '@tanstack/react-router';
-import { SimulacionPage } from '@/pages';
+import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authenticated/simulacion')({
-  component: SimulacionPage,
+  component: lazyRouteComponent(() => import('@/pages/SimulacionPage')),
 });

@@ -38,11 +38,22 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay }: MapVie
   const capacityManager = useAirportCapacityManager();
   const { airports, isLoading: airportsLoading } = capacityManager;
 
+  // Mapear aeropuertos al formato que espera useTemporalSimulation
+  const aeropuertosParaSimulacion = useMemo(() => {
+    return airports.map(a => ({
+      id: a.id,
+      codigoIATA: a.codigoIATA,
+      capacidadActual: a.cantActual || 0,
+      capacidadMaxima: a.capMaxAlmacen || 1000,
+    }));
+  }, [airports]);
+
   // Hook temporal simulation con callback de capacidad
   const simulation = useTemporalSimulation({
     timeline: resultado.lineaDeTiempo,
     timeUnit,
     onFlightCapacityChange: capacityManager.handleFlightCapacityEvent,
+    aeropuertos: aeropuertosParaSimulacion,
   });
 
   // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
@@ -64,66 +75,41 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay }: MapVie
   const canvasRenderer = useMemo(() => L.canvas(), []);
 
   // Convertir ActiveFlight a formato para AnimatedFlightMarker
-  // Agrupar productos por vuelo para calcular ocupación real
+  // IMPORTANTE: Usar eventId como clave única (no flightId) porque el mismo vuelo físico
+  // puede usarse en diferentes días/horas y cada instancia debe mostrarse como un avión separado
   const flightsForRender = useMemo(() => {
-    // Agrupar vuelos por flightId para consolidar productos
-    const flightGroups = new Map<number, typeof simulation.activeFlights>();
-    
-    simulation.activeFlights.forEach(flight => {
-      if (!flightGroups.has(flight.flightId)) {
-        flightGroups.set(flight.flightId, []);
-      }
-      flightGroups.get(flight.flightId)!.push(flight);
-    });
-    
-    // Convertir grupos a formato de renderizado
-    const flights = Array.from(flightGroups.entries()).map(([flightId, flightGroup]) => {
-      const firstFlight = flightGroup[0];
-      const origin = airports.find(a => a.id === firstFlight.originAirportId);
-      const dest = airports.find(a => a.id === firstFlight.destinationAirportId);
+    const flights = simulation.activeFlights.map(flight => {
+      const origin = airports.find(a => a.id === flight.originAirportId);
+      const dest = airports.find(a => a.id === flight.destinationAirportId);
 
       if (!origin || !dest) {
-        console.warn(`[MapViewTemporal] Vuelo ${flightId} sin aeropuertos`);
+        console.warn(`[MapViewTemporal] Vuelo ${flight.eventId} sin aeropuertos`);
         return null;
       }
 
-      // Recopilar todos los productos y órdenes de este vuelo
-      const productIds = flightGroup.map(f => f.productId);
-      const orderIds = flightGroup.map(f => f.orderId);
-      
-      // Usar capacidad real del vuelo desde el backend
-      const capacityMax = firstFlight.capacityMax;
-      // Usar cantidadProductos del backend (ya viene agrupado correctamente)
-      const capacityUsed = firstFlight.cantidadProductos || productIds.length;
-      
-      // Validación: si no viene capacidad del backend, usar fallback conservador con warning
-      if (!capacityMax) {
-        console.warn(`[MapViewTemporal] Vuelo ${flightId} sin capacidad definida, usando fallback de 100`);
-      }
-      
       return {
-        eventId: `flight-${flightId}`,
-        flightId: flightId,
-        flightCode: firstFlight.flightCode,
+        eventId: flight.eventId, // Usar eventId como clave única
+        flightId: flight.flightId,
+        flightCode: flight.flightCode,
         originCode: origin.codigoIATA || '',
         destinationCode: dest.codigoIATA || '',
-        departureTime: firstFlight.departureTime,
-        arrivalTime: firstFlight.arrivalTime,
-        currentProgress: firstFlight.progress,
-        productIds,
-        orderIds,
+        departureTime: flight.departureTime,
+        arrivalTime: flight.arrivalTime,
+        currentProgress: flight.progress,
+        productIds: [flight.productId],
+        orderIds: [flight.orderId],
         originLat: origin.latitud,
         originLon: origin.longitud,
         destLat: dest.latitud,
         destLon: dest.longitud,
-        originAirportId: firstFlight.originAirportId,
-        destinationAirportId: firstFlight.destinationAirportId,
-        capacityMax: capacityMax || 100, // Usar 100 como fallback conservador
-        capacityUsed,
+        originAirportId: flight.originAirportId,
+        destinationAirportId: flight.destinationAirportId,
+        capacityMax: flight.capacityMax || 100,
+        capacityUsed: flight.cantidadProductos || 1,
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
     
-    console.log(`[MapViewTemporal] Vuelos activos: ${simulation.activeFlights.length} productos en ${flights.length} vuelos`);
+    console.log(`[MapViewTemporal] Renderizando ${flights.length} vuelos activos`);
     
     return flights;
   }, [simulation, airports]);
