@@ -1,6 +1,5 @@
 /**
  * AnimatedFlightMarker - Marcador de avión animado con curvas Bezier
- * 
  *
  * MEJORADO para usar:
  * - Curvas Bezier cuadráticas (más realistas)
@@ -18,6 +17,7 @@ import {
   bezierPoint,
   bezierTangent,
   bearingFromTangent,
+  type LatLngTuple
 } from '../utils/bezier.utils';
 
 interface AnimatedFlightMarkerProps {
@@ -33,6 +33,7 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
   // El SVG del avión apunta hacia el noreste en su diseño original
   // Necesitamos un offset de -45° para que apunte al norte cuando bearing = 0°
   const rotation = bearing - 45;
+
   const planeHTML = `
     <svg 
       width="24" 
