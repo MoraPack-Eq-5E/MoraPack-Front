@@ -45,26 +45,23 @@ export function RoutesLayer({
     return dict;
   }, [airports]);
 
-  // Re-render cuando el mapa se mueve (debounced)
+  // Re-render cuando el mapa se mueve (inmediato para evitar desalineación)
   useEffect(() => {
     if (!map) return;
-    
-    let timeoutId: number | undefined;
 
     const onMove = () => {
-      window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        forceUpdate(x => x + 1);
-      }, 50); // Debounce de 50ms
+      forceUpdate(x => x + 1);
     };
 
+    // Escuchar todos los eventos relevantes para sincronización perfecta
     map.on('moveend', onMove);
     map.on('zoomend', onMove);
+    map.on('zoom', onMove); // También durante el zoom para mejor sincronización
     
     return () => {
-      window.clearTimeout(timeoutId);
       map.off('moveend', onMove);
       map.off('zoomend', onMove);
+      map.off('zoom', onMove);
     };
   }, [map]);
 

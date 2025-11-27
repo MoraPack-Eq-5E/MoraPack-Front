@@ -77,6 +77,41 @@ export interface AlgoritmoResponse {
 // TIPOS PARA TIMELINE DE SIMULACIÓN
 // ============================================================================
 
+export interface VueloSimpleDTO {
+  id: number;
+  codigo: string;
+  codigoOrigen: string;
+  codigoDestino: string;
+  horaSalida?: string;
+  horaLlegada?: string;
+  tiempoTransporte?: number;
+  capacidadMaxima?: number;
+  idAeropuertoOrigen?: number;
+  idAeropuertoDestino?: number;
+  horaSalidaReal?: string;  // ISO datetime - fecha+hora exacta de salida
+  horaLlegadaReal?: string; // ISO datetime - fecha+hora exacta de llegada
+}
+
+export interface RutaProductoDTO {
+  idProducto: number;
+  idPedido: number;
+  fechaPedido?: string;
+  nombrePedido?: string;
+  nombreProducto?: string;
+  peso?: number;
+  volumen?: number;
+  codigoOrigen?: string;
+  codigoDestino?: string; // ← Destino FINAL del pedido
+  vuelos: VueloSimpleDTO[];
+  cantidadVuelos?: number;
+  tiempoTotalHoras?: number;
+  estado?: string;
+  // NUEVOS: Información temporal calculada por ALNS
+  horaEntregaEstimada?: string; // ISO datetime - hora de llegada al destino final
+  llegoATiempo?: boolean;       // true si llega antes del deadline
+  margenHoras?: number;         // Horas de margen (positivo=a tiempo, negativo=tarde)
+}
+
 export interface EventoLineaDeTiempoVueloDTO {
   idEvento: string;
   tipoEvento: 'DEPARTURE' | 'ARRIVAL' | 'WAREHOUSE_TRANSFER';
@@ -84,9 +119,13 @@ export interface EventoLineaDeTiempoVueloDTO {
   idVuelo?: number;
   codigoVuelo?: string;
   idProducto?: number;
-  idPedido?: number;
+  idPedido?: number; // Para compatibilidad (primer pedido del grupo)
+  idsPedidos?: number[]; // ← TODOS los pedidos en este vuelo agrupado
   ciudadOrigen?: string;
   ciudadDestino?: string;
+  codigoIATAOrigen?: string;  // Código IATA del aeropuerto origen
+  codigoIATADestino?: string; // Código IATA del aeropuerto destino
+  esDestinoFinal?: boolean;   // true si este vuelo llega al destino FINAL del pedido
   idAeropuertoOrigen?: number;
   idAeropuertoDestino?: number;
   tiempoTransporteDias?: number;
@@ -103,6 +142,7 @@ export interface LineaDeTiempoSimulacionDTO {
   totalProductos?: number;
   totalVuelos?: number;
   totalAeropuertos?: number;
+  rutasProductos?: RutaProductoDTO[]; // Rutas para determinar destino final
 }
 
 /**
