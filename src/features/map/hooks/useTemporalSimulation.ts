@@ -29,7 +29,7 @@ export interface ActiveFlight {
 }
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'IN_FLIGHT';
   flightId: number;
   airportId: number;
   productIds: number[];
@@ -135,7 +135,7 @@ export function useTemporalSimulation({
     
     // Crear pares para cada SALIDA (DEPARTURE)
     return timeline.eventos
-      .filter(event => event.tipoEvento === 'DEPARTURE')
+      .filter(event => event.tipoEvento === 'DEPARTURE' || event.tipoEvento === 'IN_FLIGHT')
       .map(departure => {
         const arrival = departure.idVuelo ? arrivalMap.get(departure.idVuelo) : null;
         
@@ -167,8 +167,12 @@ export function useTemporalSimulation({
     
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
-      const hasDeparted = departureTime <= currentDateTime;
-      
+      //const hasDeparted = departureTime <= currentDateTime;
+      const hasDeparted = departureEvent.tipoEvento === 'IN_FLIGHT' 
+          ? true 
+          : departureTime <= currentDateTime;
+
+
       // Calcular arrival time efectivo (real o estimado)
       let effectiveArrivalTime = arrivalTime;
       if (!effectiveArrivalTime && hasDeparted) {

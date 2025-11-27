@@ -3,9 +3,8 @@
  *
  * Simulación en tiempo real usando /api/algoritmo/diario
  * Flujo:
- * 1. Cargar pedidos
- * 2. Ejecutar ventanas manual o automáticamente
- * 3. Mostrar resultados por ventana
+ * 1. Ejecutar ventanas manual o automáticamente
+ * 2. Mostrar resultados por ventana
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -38,9 +37,12 @@ export function EnVivoPage() {
   // --------------------------------------
   // HORA INICIAL = HORA LOCAL REAL DEL SISTEMA
   // --------------------------------------
+  // const [horaActual, setHoraActual] = useState(() => {
+  //   const now = new Date();
+  //   return toLocalIsoNoZ(now);
+  // });
   const [horaActual, setHoraActual] = useState(() => {
-    const now = new Date();
-    return toLocalIsoNoZ(now);
+    return "2025-11-23T10:00:00";
   });
 
   // Obtener estado de carga y refetch para forzar carga desde BD (useAirportsForMap está configurado con enabled: false)
@@ -51,7 +53,7 @@ export function EnVivoPage() {
   // ===========================
   const [autoRun, setAutoRun] = useState(false);
   // Intervalo por defecto en tiempo real: 60s
-  const [intervaloMs, setIntervaloMs] = useState(60000); // 60s por defecto
+  const [intervaloMs, setIntervaloMs] = useState(5000); //5 SEGUNDO PARA PRUEBAS RÁPIDAS
 
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
@@ -110,7 +112,7 @@ export function EnVivoPage() {
   // Iniciar operación día a día: marcar datos cargados, activar autoRun, refetch aeropuertos y ejecutar una ventana inmediata
   const iniciarOperacionDiaria = async () => {
     setDataCargada(true);
-    setAutoRun(false);
+    setAutoRun(true); //PARA PRUEBAS
     // Refrescar aeropuertos desde la BD para que el mapa pueda mostrarlos
     try {
       await refetchAirports();

@@ -10,7 +10,7 @@ import { useAirportsForMap } from './useAirportsForMap';
 import type { Aeropuerto } from '@/types/map.types';
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'IN_FLIGHT';
   flightId: number;
   airportId: number;
   productIds: number[];
