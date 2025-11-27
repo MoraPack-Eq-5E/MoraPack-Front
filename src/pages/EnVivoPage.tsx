@@ -229,3 +229,5 @@ export function EnVivoPage() {
     </div>
   );
 }
+// Export default para lazy loading
+export default EnVivoPage;
