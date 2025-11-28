@@ -3,7 +3,7 @@
  * Sigue el patrón de MoraPack-Backend: cada archivo se sube y guarda en BD inmediatamente
  */
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface ImportResult {
   success: boolean;
@@ -18,7 +18,7 @@ export interface ImportResult {
 /**
  * Importa aeropuertos desde archivo .txt
  * POST /api/data-import/airports
- * 
+ *
  * El archivo se procesa y guarda en BD inmediatamente
  * @param file Archivo aeropuertosinfo.txt
  * @returns Resultado de la importación con count de aeropuertos y ciudades
@@ -34,7 +34,7 @@ export async function importAirports(file: File): Promise<ImportResult> {
     });
 
     const result: ImportResult = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Error importando aeropuertos');
     }
@@ -49,7 +49,7 @@ export async function importAirports(file: File): Promise<ImportResult> {
 /**
  * Importa vuelos desde archivo .txt
  * POST /api/data-import/flights
- * 
+ *
  * Requiere que existan aeropuertos en BD
  * El archivo se procesa y guarda en BD inmediatamente
  * @param file Archivo vuelos.txt
@@ -66,7 +66,7 @@ export async function importFlights(file: File): Promise<ImportResult> {
     });
 
     const result: ImportResult = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Error importando vuelos');
     }
@@ -81,21 +81,21 @@ export async function importFlights(file: File): Promise<ImportResult> {
 /**
  * Importa pedidos desde archivo .txt
  * POST /api/data-import/orders
- * 
+ *
  * Requiere que existan aeropuertos en BD
  * El archivo se procesa y guarda en BD inmediatamente
  * Opcionalmente filtra por ventana de tiempo
- * 
+ *
  * @param file Archivo pedidos.txt o _pedidos_{AIRPORT}_.txt
  * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
  * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
  * @returns Resultado de la importación con count de pedidos
  */
 export async function importOrders(
-  file: File, 
-  modo: string,
-  horaInicio?: string, 
-  horaFin?: string,
+    file: File,
+    modo: string,
+    horaInicio?: string,
+    horaFin?: string,
 ): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
@@ -171,10 +171,10 @@ export interface BatchImportResult {
 /**
  * Importa múltiples archivos de pedidos en batch
  * POST /api/data-import/orders/batch
- * 
+ *
  * Requiere que existan aeropuertos en BD
  * Cada archivo se procesa con su propio aeropuerto de origen
- * 
+ *
  * @param files Array de archivos de pedidos (_pedidos_{AIRPORT}_.txt)
  * @param modo Modo de simulación: SEMANAL o COLAPSO
  * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
@@ -182,13 +182,13 @@ export interface BatchImportResult {
  * @returns Resultado detallado del batch import con información por archivo
  */
 export async function importOrdersBatch(
-  files: File[], 
-  modo: string, // 🔥 AÑADIR este parámetro
-  horaInicio?: string, 
-  horaFin?: string
+    files: File[],
+    modo: string, // 🔥 AÑADIR este parámetro
+    horaInicio?: string,
+    horaFin?: string
 ): Promise<BatchImportResult> {
   const formData = new FormData();
-  
+
   // Añadir todos los archivos al FormData
   files.forEach((file) => {
     formData.append('files', file);
@@ -214,7 +214,7 @@ export async function importOrdersBatch(
     });
 
     const result: BatchImportResult = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Error importando pedidos en batch');
     }
@@ -252,22 +252,22 @@ export interface BatchImportResult {
 /**
  * Importa múltiples archivos de pedidos en batch
  * POST /api/data-import/orders/batch
- * 
+ *
  * Requiere que existan aeropuertos en BD
  * Cada archivo se procesa con su propio aeropuerto de origen
- * 
+ *
  * @param files Array de archivos de pedidos (_pedidos_{AIRPORT}_.txt)
  * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
  * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
  * @returns Resultado detallado del batch import con información por archivo
  */
 // export async function importOrdersBatch(
-//   files: File[], 
-//   horaInicio?: string, 
+//   files: File[],
+//   horaInicio?: string,
 //   horaFin?: string
 // ): Promise<BatchImportResult> {
 //   const formData = new FormData();
-  
+
 //   // Añadir todos los archivos al FormData
 //   files.forEach((file) => {
 //     formData.append('files', file);
@@ -289,7 +289,7 @@ export interface BatchImportResult {
 //     });
 
 //     const result: BatchImportResult = await response.json();
-    
+
 //     if (!response.ok) {
 //       throw new Error(result.message || 'Error importando pedidos en batch');
 //     }

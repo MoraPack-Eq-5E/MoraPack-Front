@@ -2,8 +2,7 @@
  * Servicio para cargar datos desde archivos a la base de datos
  * Equivalente a DataLoadAPI del backend
  */
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface CargaDatosRequest {
   directorioArchivos?: string;
@@ -65,7 +64,7 @@ export async function cargarPedidos(
     params.append('modo', request.modo);          // 🔹 NUEVO
   }
 
-  const url = `${API_BASE}/api/datos/cargar-pedidos${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${API_URL}/api/datos/cargar-pedidos${params.toString() ? '?' + params.toString() : ''}`;
   
   const response = await fetch(url, {
     method: 'POST',
@@ -86,8 +85,8 @@ export async function cargarPedidos(
  * Obtiene el estado actual de los datos en la base de datos
  * GET /api/datos/estado
  */
-export async function obtenerEstadoDatos(): Promise<EstadoDatosResponse> {
-  const response = await fetch(`${API_BASE}/api/datos/estado`);
+export async function obtenerEstadoDatosNoDiario(): Promise<EstadoDatosResponse> {
+  const response = await fetch(`${API_URL}/api/datos/estadoNoDiario`);
 
   if (!response.ok) {
     throw new Error(`Error al obtener estado de datos: ${response.statusText}`);

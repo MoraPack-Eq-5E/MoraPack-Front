@@ -2,8 +2,7 @@
  * Servicio para ejecutar algoritmo ALNS en escenarios diario y semanal
  * Alineado con AlgoritmoController del backend
  */
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface AlgoritmoRequest {
   // Ventana de tiempo de simulación
@@ -152,7 +151,7 @@ export interface LineaDeTiempoSimulacionDTO {
 export async function ejecutarAlgoritmoDiario(
   request: AlgoritmoRequest
 ): Promise<AlgoritmoResponse> {
-  const response = await fetch(`${API_BASE}/api/algoritmo/diario`, {
+  const response = await fetch(`${API_URL}/api/algoritmo/diario`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -177,7 +176,7 @@ export async function ejecutarAlgoritmoDiario(
 export async function ejecutarAlgoritmoSemanal(
   request: AlgoritmoRequest
 ): Promise<AlgoritmoResponse> {
-  const response = await fetch(`${API_BASE}/api/algoritmo/semanal`, {
+  const response = await fetch(`${API_URL}/api/algoritmo/semanal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -200,7 +199,7 @@ export async function ejecutarAlgoritmoSemanal(
 export async function ejecutarAlgoritmo(
   request: AlgoritmoRequest
 ): Promise<AlgoritmoResponse> {
-  const response = await fetch(`${API_BASE}/api/algoritmo/ejecutar`, {
+  const response = await fetch(`${API_URL}/api/algoritmo/ejecutar`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -244,7 +243,7 @@ export interface ResultadoColapsoDTO {
 export async function ejecutarAlgoritmoColapso(
   request: AlgoritmoRequest
 ): Promise<ResultadoColapsoDTO> {
-  const response = await fetch(`${API_BASE}/api/algoritmo/colapso`, {
+  const response = await fetch(`${API_URL}/api/algoritmo/colapso`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

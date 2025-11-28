@@ -9,7 +9,12 @@
 
 import { useState } from 'react';
 import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import { cargarPedidos, obtenerEstadoDatos, type CargaDatosResponse, type EstadoDatosResponse } from '@/services/cargaDatos.service';
+import {
+  cargarPedidos,
+  obtenerEstadoDatosNoDiario,
+  type CargaDatosResponse,
+  type EstadoDatosResponse
+} from '@/services/cargaDatos.service';
 import { ejecutarAlgoritmoSemanal, 
   ejecutarAlgoritmoColapso,
   type AlgoritmoRequest, type AlgoritmoResponse,
@@ -67,9 +72,9 @@ export function SimulacionPage() {
       
       // IMPORTANTE: Refetch de aeropuertos después de importar
       await refetchAirports();
-      
+      console.log('OBTENER ESTADO DATOS');
       // Obtener estado de datos desde BD
-      const estado = await obtenerEstadoDatos();
+      const estado = await obtenerEstadoDatosNoDiario();
       setEstadoDatos(estado);
       
       
@@ -124,7 +129,7 @@ export function SimulacionPage() {
       setDataCargada(true);
       
       // Obtener estado de datos
-      const estado = await obtenerEstadoDatos();
+      const estado = await obtenerEstadoDatosNoDiario();
       setEstadoDatos(estado);
       
       console.log('✅ Datos cargados:', resultado.estadisticas);
@@ -202,14 +207,14 @@ export function SimulacionPage() {
     }
   };
   
-  const handleRestart = () => {
-    setCurrentStep('load-data');
-    setDataCargada(false);
-    setResultadoCarga(null);
-    setEstadoDatos(null);
-    setResultadoAlgoritmo(null);
-    setError(null);
-  };
+  //const handleRestart = () => {
+  //  setCurrentStep('load-data');
+  //  setDataCargada(false);
+  //  setResultadoCarga(null);
+  //  setEstadoDatos(null);
+  //  setResultadoAlgoritmo(null);
+  //  setError(null);
+  //};
   // ==================== RENDERIZADO CONDICIONAL ======================================
 //   const renderResultadosSemanales = () => (
 //     <div className="h-full flex flex-col">

@@ -4,7 +4,7 @@
 
 import type { FileUploadValidationResponse } from '@/types/fileUpload.types';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 /**
  * Valida archivos de simulación

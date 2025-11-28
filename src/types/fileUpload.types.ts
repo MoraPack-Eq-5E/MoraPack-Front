@@ -74,8 +74,7 @@ export interface FileUploadValidationResponse {
   pedidos?: FileValidationResult;
   /** Resultado de validación para cancelaciones.txt */
   cancelaciones?: FileValidationResult;
-  
-  cancelaciones?: FileValidationResult;
+
 
   /** Mensaje general sobre el resultado */
   message?: string;
