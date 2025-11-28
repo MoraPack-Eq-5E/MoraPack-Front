@@ -2,9 +2,12 @@
  * Export de todos los servicios
  */
 
-// Servicios de algoritmo
-export * from './algoritmo.service';
-export * from './algoritmoSemanal.service';
+// Servicios de algoritmo - Export específico para evitar conflictos
+export { ejecutarAlgoritmo, type ResultadoAlgoritmoDTO, type RutaDTO, type VueloSimpleDTO, type RutaProductoDTO } from './algoritmo.service';
+export { ejecutarAlgoritmoSemanal, type AlgoritmoRequest, type AlgoritmoResponse } from './algoritmoSemanal.service';
+
+// Re-export de tipos compartidos desde algoritmo.service (fuente canónica)
+export type { EventoLineaDeTiempoVueloDTO, LineaDeTiempoSimulacionDTO } from './algoritmo.service';
 
 // Servicios de datos
 export * from './cargaDatos.service';

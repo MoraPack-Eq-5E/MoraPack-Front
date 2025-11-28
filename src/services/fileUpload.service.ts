@@ -4,7 +4,7 @@
 
 import type { FileUploadValidationResponse } from '@/types/fileUpload.types';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * Valida archivos de simulación
@@ -49,18 +49,21 @@ export async function validateSimulationFiles(
       body: formData,
     });
     
-    const data: FileUploadValidationResponse = await response.json();
-    
     if (!response.ok) {
-      // Si el servidor devolvió error, pero tenemos data, usarla
-      if (data) {
-        return data;
+      // Intentar parsear respuesta de error
+      try {
+        const errorData = await response.json() as FileUploadValidationResponse;
+        if (errorData) {
+          return errorData;
+        }
+      } catch {
+        // Si no se puede parsear, lanzar error genérico
+        throw new Error(`Error al validar archivos: ${response.statusText}`);
       }
-      throw new Error(
-        data?.message || `Error al validar archivos: ${response.statusText}`
-      );
+      throw new Error(`Error al validar archivos: ${response.statusText}`);
     }
     
+    const data = await response.json() as FileUploadValidationResponse;
     return data;
   } catch (error) {
     console.error('Error validating files:', error);
