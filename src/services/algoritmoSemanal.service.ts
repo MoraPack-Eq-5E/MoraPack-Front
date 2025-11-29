@@ -2,7 +2,7 @@
  * Servicio para ejecutar algoritmo ALNS en escenarios diario y semanal
  * Alineado con AlgoritmoController del backend
  */
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface AlgoritmoRequest {
   // Ventana de tiempo de simulación

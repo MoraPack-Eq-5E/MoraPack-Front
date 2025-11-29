@@ -2,7 +2,7 @@
  * Servicio para cargar datos desde archivos a la base de datos
  * Equivalente a DataLoadAPI del backend
  */
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface CargaDatosRequest {
   directorioArchivos?: string;
