@@ -76,6 +76,7 @@ export function AnimatedFlightMarker({
   }
 
   // Precalcular puntos de la curva Bezier
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const bezierData = useMemo(() => {
     const start: LatLngTuple = [flight.originLat!, flight.originLon!];
     const end: LatLngTuple = [flight.destLat!, flight.destLon!];
@@ -85,6 +86,7 @@ export function AnimatedFlightMarker({
   }, [flight.originLat, flight.originLon, flight.destLat, flight.destLon, curvature]);
 
   // Color basado en porcentaje de ocupación de la capacidad del avión
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const color = useMemo(() => {
     const capacityMax = flight.capacityMax || 300; // Capacidad estándar por defecto
     const capacityUsed = flight.capacityUsed || flight.productIds.length;

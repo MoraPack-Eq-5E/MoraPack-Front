@@ -1,6 +1,6 @@
 /**
  * MapViewTemporal
- * 
+ *
  * Versión mejorada de MapView que usa useTemporalSimulation
  */
 
@@ -18,9 +18,9 @@ import { OccupancyLegend } from './OccupancyLegend';
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
   // Opcional: unidad de tiempo inicial (por defecto mantiene 'hours' para páginas semanales)
-  initialTimeUnit?: TimeUnit;
+  //initialTimeUnit?: TimeUnit;
   // Opcional: iniciar reproducción automáticamente
-  autoPlay?: boolean;
+  //autoPlay?: boolean;
 }
 
 // Constantes
@@ -31,7 +31,7 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
   return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
 }
 
-export function MapViewTemporal({ resultado, /*initialTimeUnit*//*, autoPlay*/ }: MapViewTemporalProps) {
+export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/ }: MapViewTemporalProps) {
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(/*initialTimeUnit ??*/ 'hours');
 
   // Hook de gestión de capacidades de aeropuertos
@@ -108,11 +108,12 @@ export function MapViewTemporal({ resultado, /*initialTimeUnit*//*, autoPlay*/ }
         capacityUsed: flight.cantidadProductos || 1,
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
-    
+
     console.log(`[MapViewTemporal] Renderizando ${flights.length} vuelos activos`);
-    
+
     return flights;
   }, [simulation.activeFlights, airports]);
+
 
   // Culling de vuelos
   const culledFlights = useMemo(() => {
@@ -157,39 +158,39 @@ export function MapViewTemporal({ resultado, /*initialTimeUnit*//*, autoPlay*/ }
       <MapCanvas className="h-full w-full">
         {/* Aeropuertos */}
         {airports
-          .filter(airport => 
-            isValidCoordinate(airport.latitud) && 
+          .filter(airport =>
+            isValidCoordinate(airport.latitud) &&
             isValidCoordinate(airport.longitud)
           )
           .map((airport) => (
-            <AirportMarker 
-              key={airport.id} 
+            <AirportMarker
+              key={airport.id}
               airport={airport}
             />
           ))}
-        
+
         {/* Rutas */}
         {culledFlights.length > 0 && (
-          <RoutesLayer 
+          <RoutesLayer
             flights={culledFlights}
             airports={airports}
             canvasRenderer={canvasRenderer}
             curvature={CURVATURE}
           />
         )}
-        
+
         {/* Aviones animados */}
         {culledFlights.map((flight) => {
-          if (!isValidCoordinate(flight.originLat) || 
-              !isValidCoordinate(flight.originLon) || 
-              !isValidCoordinate(flight.destLat) || 
+          if (!isValidCoordinate(flight.originLat) ||
+              !isValidCoordinate(flight.originLon) ||
+              !isValidCoordinate(flight.destLat) ||
               !isValidCoordinate(flight.destLon)) {
             return null;
           }
-          
+
           return (
-            <AnimatedFlightMarker 
-              key={flight.eventId} 
+            <AnimatedFlightMarker
+              key={flight.eventId}
               flight={flight}
               curvature={CURVATURE}
             />
