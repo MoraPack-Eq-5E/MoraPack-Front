@@ -71,8 +71,11 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
     capacityManager.resetCapacities();
   };
 
-  // Canvas renderer
-  const canvasRenderer = useMemo(() => L.canvas(), []);
+  // Canvas renderer para rutas (sin captura de eventos de puntero)
+  const canvasRenderer = useMemo(() => L.canvas({ 
+    padding: 0,
+    pane: 'overlayPane' // Asegura que esté debajo de los marcadores
+  }), []);
 
   // Convertir ActiveFlight a formato para AnimatedFlightMarker
   // Los vuelos ya vienen agrupados por vuelo físico desde useTemporalSimulation
