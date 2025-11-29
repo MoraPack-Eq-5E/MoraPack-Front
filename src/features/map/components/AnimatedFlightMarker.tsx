@@ -12,13 +12,7 @@ import { useEffect, useRef, useMemo } from 'react';
 import { useMap } from 'react-leaflet';
 import L, { DivIcon, Marker as LeafletMarker } from 'leaflet';
 import type { ActiveFlightState } from '@/services/simulation-player.service';
-import { 
-  computeControlPoint, 
-  bezierPoint, 
-  bezierTangent, 
-  bearingFromTangent,
-  type LatLngTuple 
-} from '../utils/bezier.utils';
+import { computeControlPoint, bezierPoint, bezierTangent, bearingFromTangent, type LatLngTuple } from '../utils/bezier.utils';
 
 interface AnimatedFlightMarkerProps {
   flight: ActiveFlightState;
@@ -33,7 +27,7 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
   // El SVG del avión apunta hacia el noreste en su diseño original
   // Necesitamos un offset de -45° para que apunte al norte cuando bearing = 0°
   const rotation = bearing - 45;
-  
+
   // Contenedor más grande (48x48) con el avión centrado (24x24)
   const planeHTML = `
     <div style="
@@ -60,22 +54,22 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
       </svg>
     </div>
   `;
-  
-  return new DivIcon({ 
-    html: planeHTML, 
-    className: 'plane-icon', 
-    iconSize: [48, 48], 
-    iconAnchor: [24, 24] 
+
+  return new DivIcon({
+    html: planeHTML,
+    className: 'plane-icon',
+    iconSize: [48, 48],
+    iconAnchor: [24, 24]
   });
 }
 
 /**
  * Componente mejorado con curvas Bezier y rotación precisa
  */
-export function AnimatedFlightMarker({ 
-  flight, 
-  curvature = 0.25
-}: AnimatedFlightMarkerProps) {
+export function AnimatedFlightMarker({
+     flight,
+     curvature = 0.25
+     }: AnimatedFlightMarkerProps) {
   const map = useMap();
   const markerRef = useRef<LeafletMarker | null>(null);
 
@@ -85,20 +79,22 @@ export function AnimatedFlightMarker({
   }
 
   // Precalcular puntos de la curva Bezier
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const bezierData = useMemo(() => {
     const start: LatLngTuple = [flight.originLat!, flight.originLon!];
     const end: LatLngTuple = [flight.destLat!, flight.destLon!];
     const ctrl = computeControlPoint(start, end, curvature);
-    
+
     return { start, end, ctrl };
   }, [flight.originLat, flight.originLon, flight.destLat, flight.destLon, curvature]);
 
   // Color basado en porcentaje de ocupación de la capacidad del avión
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const color = useMemo(() => {
     const capacityMax = flight.capacityMax || 300; // Capacidad estándar por defecto
     const capacityUsed = flight.capacityUsed || flight.productIds.length;
     const occupancyPercent = (capacityUsed / capacityMax) * 100;
-    
+
     // Colores según imagen:
     // Verde oscuro: < 70% (Moderada)
     // Amarillo: 70-85% (Alta)
@@ -119,11 +115,11 @@ export function AnimatedFlightMarker({
   const currentState = useMemo(() => {
     const { start, ctrl, end } = bezierData;
     const progress = Math.max(0, Math.min(1, flight.currentProgress));
-    
+
     const position = bezierPoint(progress, start, ctrl, end);
     const tangent = bezierTangent(progress, start, ctrl, end);
     const bearing = bearingFromTangent(tangent);
-    
+
     return { position, bearing };
   }, [bezierData, flight.currentProgress]);
 
@@ -135,25 +131,25 @@ export function AnimatedFlightMarker({
     const [lat, lng] = position;
 
     const icon = createPlaneIcon(bearing, color);
-    const marker = L.marker([lat, lng], { 
-      icon, 
+    const marker = L.marker([lat, lng], {
+      icon,
       interactive: true,
       bubblingMouseEvents: false,
       pane: 'markerPane', // Asegura que esté encima de las rutas
-      zIndexOffset: 1000 
+      zIndexOffset: 1000
     });
 
     // Usar capacityUsed directamente del objeto flight
     const capacityUsed = flight.capacityUsed || flight.productIds.length;
     const capacityMax = flight.capacityMax || 360;
     const progressPercent = Math.round(flight.currentProgress * 100);
-    
+
     // Contar pedidos agrupados en este vuelo
     const numPedidos = flight.orderIds?.length || 1;
-    
+
     // Usar el código de vuelo sin modificar (ya viene limpio del backend)
     const cleanFlightCode = flight.flightCode;
-    
+
     marker.bindPopup(`
       <div style="min-width: 220px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
@@ -176,20 +172,40 @@ export function AnimatedFlightMarker({
       map.removeLayer(marker);
       markerRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]); // Solo depende de map - se crea una vez
 
-  // Actualizar posición e icono (SIN destruir el marcador)
+  // Actualizar posición, icono y popup (SIN destruir el marcador)
   useEffect(() => {
     if (!markerRef.current) return;
 
     const { position, bearing } = currentState;
     const [lat, lng] = position;
-    
+
     markerRef.current.setLatLng([lat, lng]);
     markerRef.current.setIcon(createPlaneIcon(bearing, color));
-  }, [currentState, color]);
+    
+    // Actualizar contenido del popup con progreso actual
+    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const capacityMax = flight.capacityMax || 360;
+    const progressPercent = Math.round(flight.currentProgress * 100);
+    const numPedidos = flight.orderIds?.length || 1;
+    const cleanFlightCode = flight.flightCode;
+    
+    markerRef.current.setPopupContent(`
+      <div style="min-width: 220px; font-family: system-ui, sans-serif;">
+        <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
+          ${cleanFlightCode}
+        </div>
+        <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
+          <div>${flight.originCode} → ${flight.destinationCode}</div>
+          <div>Progreso: ${progressPercent}%</div>
+          <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
+          <div>Num. Pedidos: ${numPedidos}</div>
+        </div>
+      </div>
+    `);
+  }, [currentState, color, flight]);
 
   return null; // Este componente no renderiza React, usa Leaflet nativo
 }
-

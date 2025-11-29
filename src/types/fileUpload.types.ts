@@ -5,6 +5,22 @@
 /**
  * Tipo de archivo de simulación
  */
+
+// export const SimulationFileType = {
+//   AEROPUERTOS: 'AEROPUERTOS',
+//   VUELOS: 'VUELOS',
+//   PEDIDOS: 'PEDIDOS',
+//   CANCELACIONES: 'CANCELACIONES'
+// } as const;
+
+// export type SimulationFileType = typeof SimulationFileType[keyof typeof SimulationFileType];
+
+// export enum SimulationFileType {
+//   AEROPUERTOS = 'AEROPUERTOS',
+//   VUELOS = 'VUELOS',
+//   PEDIDOS = 'PEDIDOS',
+//   CANCELACIONES = 'CANCELACIONES',
+// }
 export const SimulationFileType = {
   AEROPUERTOS: 'AEROPUERTOS',
   VUELOS: 'VUELOS',
@@ -13,6 +29,7 @@ export const SimulationFileType = {
 } as const;
 
 export type SimulationFileType = typeof SimulationFileType[keyof typeof SimulationFileType];
+
 
 /**
  * Resultado de validación para un archivo individual
@@ -57,7 +74,8 @@ export interface FileUploadValidationResponse {
   pedidos?: FileValidationResult;
   /** Resultado de validación para cancelaciones.txt */
   cancelaciones?: FileValidationResult;
-  
+
+
   /** Mensaje general sobre el resultado */
   message?: string;
   
@@ -94,6 +112,7 @@ export interface UploadFilesState {
 
   /** Archivo de cancelaciones */
   cancelaciones?: UploadedFile;
+  
   /** ID de sesión después de validación exitosa */
   sessionId?: string;
   

@@ -1,8 +1,8 @@
 /**
  * useTemporalSimulation
- * 
+ *
  * Hook para procesar y reproducir una simulación temporal basada en eventos de timeline.
- * 
+ *
  * Características:
  * - Control de velocidad (seconds, minutes, hours, days)
  * - Play/Pause/Reset/Seek
@@ -32,9 +32,10 @@ export interface ActiveFlight {
 }
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'PICKUP';
   flightId: number;
   airportId: number;
+  airportCode?: string; // Código IATA (para PICKUP)
   productIds: number[];
   totalVolume: number;
   timestamp: Date;
@@ -65,6 +66,7 @@ interface PendingPickup {
   airportCode: string;
   cantidad: number;
   pickupTime: Date;
+  flightEventId: string; // ID del evento de vuelo para hacer cada recogida única
 }
 
 export type TimeUnit = 'seconds' | 'minutes' | 'hours' | 'days';
@@ -86,11 +88,11 @@ function getSecondsPerRealSecond(timeUnit: TimeUnit): number {
 }
 
 export function useTemporalSimulation({
-  timeline,
-  timeUnit = 'hours',
-  onFlightCapacityChange,
-  aeropuertos,
-}: UseTemporalSimulationProps) {
+                                        timeline,
+                                        timeUnit = 'hours',
+                                        onFlightCapacityChange,
+                                        aeropuertos,
+                                      }: UseTemporalSimulationProps) {
   // Estados principales
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSimTime, setCurrentSimTime] = useState(0); // segundos desde inicio
@@ -101,29 +103,29 @@ export function useTemporalSimulation({
     inFlight: 0,
     pending: 0,
   });
-  
+
   // Estado de almacenamiento por aeropuerto (código IATA -> estado)
   const [warehouseStorage, setWarehouseStorage] = useState<Map<string, WarehouseState>>(new Map());
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
+
   // Rastrear qué eventos de capacidad ya se han disparado para evitar duplicados
   const processedCapacityEventsRef = useRef<Set<string>>(new Set());
-  
+
   // Cola de recogidas pendientes (destino final + 2h)
   const pendingPickupsRef = useRef<PendingPickup[]>([]);
-  
+
   // Eventos de warehouse ya procesados para evitar duplicados
   const processedWarehouseEventsRef = useRef<Set<string>>(new Set());
-  
+
   // Refs para callbacks
   const onFlightCapacityChangeRef = useRef(onFlightCapacityChange);
-  
+
   // Actualizar ref cuando callback cambia
   useEffect(() => {
     onFlightCapacityChangeRef.current = onFlightCapacityChange;
   }, [onFlightCapacityChange]);
-  
+
   // Inicializar estado de almacenes cuando se cargan aeropuertos
   useEffect(() => {
     if (aeropuertos && aeropuertos.length > 0) {
@@ -135,35 +137,35 @@ export function useTemporalSimulation({
         });
       });
       setWarehouseStorage(initialStorage);
-      console.log(`[useTemporalSimulation] Almacenes inicializados: ${initialStorage.size} aeropuertos`);
+      // console.log(`[useTemporalSimulation] Almacenes inicializados: ${initialStorage.size} aeropuertos`);
     }
   }, [aeropuertos]);
-  
+
   // Velocidad de reproducción
   const playbackSpeed = useMemo(() => getSecondsPerRealSecond(timeUnit), [timeUnit]);
-  
+
   // Hora de inicio de simulación
   const simulationStartTime = useMemo(() => {
     if (!timeline) return new Date();
     return new Date(timeline.horaInicioSimulacion);
   }, [timeline]);
-  
+
   // Duración total en segundos
   const totalDurationSeconds = useMemo(() => {
     return (timeline?.duracionTotalMinutos || 0) * 60;
   }, [timeline]);
-  
+
   // Hora actual de simulación
   const currentSimDateTime = useMemo(() => {
     return new Date(simulationStartTime.getTime() + currentSimTime * 1000);
   }, [simulationStartTime, currentSimTime]);
-  
+
   // Calcular total de pedidos únicos (usando idsPedidos si está disponible)
   const totalOrdersCount = useMemo(() => {
     if (!timeline?.eventos || timeline.eventos.length === 0) {
       return 0;
     }
-    
+
     const uniqueOrderIds = new Set<number>();
     timeline.eventos.forEach(event => {
       // Usar la lista completa de pedidos si está disponible
@@ -174,39 +176,54 @@ export function useTemporalSimulation({
         uniqueOrderIds.add(event.idPedido);
       }
     });
-    
+
     return uniqueOrderIds.size;
   }, [timeline]);
-  
+
   // Mapa de idPedido → codigoDestinoFinal (para saber cuándo un pedido está realmente entregado)
   const orderFinalDestinations = useMemo(() => {
     const map = new Map<number, string>();
-    
+
     if (timeline?.rutasProductos) {
       timeline.rutasProductos.forEach(ruta => {
         if (!ruta.idPedido) return;
+        
+        // Si ya tenemos el destino para este pedido, no sobrescribir
+        if (map.has(ruta.idPedido)) return;
         
         // Prioridad 1: usar codigoDestino de la ruta (destino final del pedido)
         if (ruta.codigoDestino) {
           map.set(ruta.idPedido, ruta.codigoDestino);
           return;
         }
-        
+
         // Prioridad 2: usar el destino del último vuelo de la ruta
         if (ruta.vuelos && ruta.vuelos.length > 0) {
           const ultimoVuelo = ruta.vuelos[ruta.vuelos.length - 1];
-          // Intentar codigoDestino, luego horaLlegadaReal info
           const destino = ultimoVuelo.codigoDestino;
           if (destino) {
             map.set(ruta.idPedido, destino);
             return;
           }
         }
-        
       });
-      
     }
     
+    // También extraer destinos de los eventos con esDestinoFinal=true
+    if (timeline?.eventos) {
+      timeline.eventos.forEach(evento => {
+        if (evento.tipoEvento === 'ARRIVAL' && evento.esDestinoFinal && evento.codigoIATADestino) {
+          // Para cada pedido en este evento que llega a destino final
+          const pedidos = evento.idsPedidos || (evento.idPedido ? [evento.idPedido] : []);
+          pedidos.forEach(idPedido => {
+            if (!map.has(idPedido)) {
+              map.set(idPedido, evento.codigoIATADestino!);
+            }
+          });
+        }
+      });
+    }
+
     return map;
   }, [timeline]);
 
@@ -214,7 +231,7 @@ export function useTemporalSimulation({
   // Estructura: Map<idVuelo, { horaSalidaReal, horaLlegadaReal }>
   const flightRealTimes = useMemo(() => {
     const map = new Map<number, { horaSalidaReal: Date | null; horaLlegadaReal: Date | null }>();
-    
+
     if (timeline?.rutasProductos) {
       timeline.rutasProductos.forEach(ruta => {
         if (ruta.vuelos) {
@@ -229,10 +246,10 @@ export function useTemporalSimulation({
         }
       });
     }
-    
+
     return map;
   }, [timeline]);
-  
+
   // Procesar eventos y crear pares DEPARTURE-ARRIVAL
   // IMPORTANTE: Emparejar por número de evento (DEP-X ↔ ARR-X), no por idVuelo
   // NUEVO: Usar tiempos reales del ALNS cuando estén disponibles
@@ -240,12 +257,12 @@ export function useTemporalSimulation({
     if (!timeline?.eventos || timeline.eventos.length === 0) {
       return [];
     }
-    
+
     // Extraer número del idEvento (ej: "ARR-5" → "5", "DEP-123-45-0" → "123-45-0")
     const extractEventNumber = (idEvento: string): string => {
       return idEvento.replace(/^(DEP|ARR)-/, '');
     };
-    
+
     // Indexar LLEGADAs (ARRIVAL) por número de evento
     const arrivalMap = new Map<string, EventoLineaDeTiempoVueloDTO>();
     timeline.eventos.forEach(event => {
@@ -254,50 +271,50 @@ export function useTemporalSimulation({
         arrivalMap.set(eventNumber, event);
       }
     });
-    
+
     // Crear pares para cada SALIDA (DEPARTURE)
     return timeline.eventos
-      .filter(event => event.tipoEvento === 'DEPARTURE')
-      .map(departure => {
-        // Buscar ARRIVAL correspondiente por número de evento
-        const eventNumber = extractEventNumber(departure.idEvento);
-        const arrival = arrivalMap.get(eventNumber) || null;
-        
-        // NUEVO: Intentar usar tiempos reales del ALNS si están disponibles
-        const flightId = departure.idVuelo || 0;
-        const realTimes = flightRealTimes.get(flightId);
-        
-        // Priorizar tiempos reales del ALNS, luego eventos, luego null
-        let departureTime: Date;
-        let arrivalTime: Date | null;
-        
-        if (realTimes?.horaSalidaReal) {
-          // Usar tiempo real calculado por ALNS
-          departureTime = realTimes.horaSalidaReal;
-        } else {
-          // Fallback: usar hora del evento
-          departureTime = new Date(departure.horaEvento);
-        }
-        
-        if (realTimes?.horaLlegadaReal) {
-          // Usar tiempo real calculado por ALNS
-          arrivalTime = realTimes.horaLlegadaReal;
-        } else if (arrival) {
-          // Fallback: usar hora del evento de llegada
-          arrivalTime = new Date(arrival.horaEvento);
-        } else {
-          arrivalTime = null;
-        }
-        
-        return {
-          departureEvent: departure,
-          arrivalEvent: arrival,
-          departureTime,
-          arrivalTime,
-        };
-      });
+        .filter(event => event.tipoEvento === 'DEPARTURE')
+        .map(departure => {
+          // Buscar ARRIVAL correspondiente por número de evento
+          const eventNumber = extractEventNumber(departure.idEvento);
+          const arrival = arrivalMap.get(eventNumber) || null;
+
+          // NUEVO: Intentar usar tiempos reales del ALNS si están disponibles
+          const flightId = departure.idVuelo || 0;
+          const realTimes = flightRealTimes.get(flightId);
+
+          // Priorizar tiempos reales del ALNS, luego eventos, luego null
+          let departureTime: Date;
+          let arrivalTime: Date | null;
+
+          if (realTimes?.horaSalidaReal) {
+            // Usar tiempo real calculado por ALNS
+            departureTime = realTimes.horaSalidaReal;
+          } else {
+            // Fallback: usar hora del evento
+            departureTime = new Date(departure.horaEvento);
+          }
+
+          if (realTimes?.horaLlegadaReal) {
+            // Usar tiempo real calculado por ALNS
+            arrivalTime = realTimes.horaLlegadaReal;
+          } else if (arrival) {
+            // Fallback: usar hora del evento de llegada
+            arrivalTime = new Date(arrival.horaEvento);
+          } else {
+            arrivalTime = null;
+          }
+
+          return {
+            departureEvent: departure,
+            arrivalEvent: arrival,
+            departureTime,
+            arrivalTime,
+          };
+        });
   }, [timeline, flightRealTimes]);
-  
+
   // Actualizar vuelos activos según tiempo actual
   useEffect(() => {
     if (flightPairs.length === 0) {
@@ -306,49 +323,48 @@ export function useTemporalSimulation({
       setFlightStats({ completed: 0, inFlight: 0, pending: 0 });
       return;
     }
-    
+
     const currentDateTime = new Date(simulationStartTime.getTime() + currentSimTime * 1000);
     const flightsMap = new Map<string, ActiveFlight>();
     const completedOrderIds = new Set<number>();
-    
+
     let completedCount = 0;
     let pendingCount = 0;
-    let flightsWithInvalidAirports = 0;
     
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
       const hasDeparted = departureTime <= currentDateTime;
-      
+
       // Calcular arrival time efectivo (real o estimado)
       let effectiveArrivalTime = arrivalTime;
       if (!effectiveArrivalTime && hasDeparted) {
         // Fallback: usar tiempoTransporteDias o 0.5 días (12 horas) por defecto
         const transportDays = departureEvent.tiempoTransporteDias || 0.5;
         effectiveArrivalTime = new Date(
-          departureTime.getTime() + transportDays * 24 * 60 * 60 * 1000
+            departureTime.getTime() + transportDays * 24 * 60 * 60 * 1000
         );
       }
-      
-      const hasArrived = effectiveArrivalTime 
-        ? effectiveArrivalTime <= currentDateTime 
-        : false;
-      
+
+      const hasArrived = effectiveArrivalTime
+          ? effectiveArrivalTime <= currentDateTime
+          : false;
+
       const flightId = departureEvent.idVuelo || 0;
       const eventId = departureEvent.idEvento; // Usar eventId único para claves
       const departureKey = `${eventId}-departed`;
       const arrivalKey = `${eventId}-arrived`;
-      
+
       // CORREGIDO: Disparar DEPARTURE cuando el vuelo ha despegado (sin importar si llegó)
       // Esto debe ejecutarse ANTES de verificar si llegó
       if (hasDeparted && departureEvent.idAeropuertoOrigen) {
         if (
-          onFlightCapacityChangeRef.current && 
-          !processedCapacityEventsRef.current.has(`${departureKey}-capacity`)
+            onFlightCapacityChangeRef.current &&
+            !processedCapacityEventsRef.current.has(`${departureKey}-capacity`)
         ) {
           processedCapacityEventsRef.current.add(`${departureKey}-capacity`);
-          
+
           const totalVolume = departureEvent.cantidadProductos || 1;
-          
+
           onFlightCapacityChangeRef.current({
             eventType: 'DEPARTURE',
             flightId: flightId,
@@ -357,13 +373,14 @@ export function useTemporalSimulation({
             totalVolume: totalVolume,
             timestamp: departureTime, // Usar tiempo de despegue real
           });
+
         }
       }
-      
+
       if (hasArrived && effectiveArrivalTime) {
         // ✅ Vuelo completado - pero solo marcar pedido como entregado si llegó al DESTINO FINAL
         const destinoVuelo = departureEvent.ciudadDestino;
-        
+
         if (departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0) {
           departureEvent.idsPedidos.forEach(id => {
             const destinoFinal = orderFinalDestinations.get(id);
@@ -379,18 +396,18 @@ export function useTemporalSimulation({
           }
         }
         completedCount++;
-        
+
         // Disparar evento de capacidad ARRIVAL (solo una vez)
         if (
-          onFlightCapacityChangeRef.current && 
-          !processedCapacityEventsRef.current.has(`${arrivalKey}-capacity`) &&
-          departureEvent.idAeropuertoDestino
+            onFlightCapacityChangeRef.current &&
+            !processedCapacityEventsRef.current.has(`${arrivalKey}-capacity`) &&
+            departureEvent.idAeropuertoDestino
         ) {
           processedCapacityEventsRef.current.add(`${arrivalKey}-capacity`);
-          
+
           // Usar cantidadProductos del DTO
           const totalVolume = departureEvent.cantidadProductos || 1;
-          
+
           onFlightCapacityChangeRef.current({
             eventType: 'ARRIVAL',
             flightId: flightId,
@@ -399,20 +416,21 @@ export function useTemporalSimulation({
             totalVolume: totalVolume,
             timestamp: effectiveArrivalTime, // Usar tiempo de llegada real
           });
+
+
         }
       } else if (hasDeparted && effectiveArrivalTime) {
         // ✈️ Vuelo en progreso
-        
+
         // Validar que tenga aeropuertos válidos
-        const hasValidAirports = 
-          departureEvent.idAeropuertoOrigen && 
-          departureEvent.idAeropuertoDestino;
-        
+        const hasValidAirports =
+            departureEvent.idAeropuertoOrigen &&
+            departureEvent.idAeropuertoDestino;
+
         if (!hasValidAirports) {
-          flightsWithInvalidAirports++;
-          return; // Skip
+          return; // Skip vuelos sin aeropuertos válidos
         }
-        
+
         const totalDuration = effectiveArrivalTime.getTime() - departureTime.getTime();
         const elapsed = currentDateTime.getTime() - departureTime.getTime();
         const progress = Math.max(0, Math.min(1, elapsed / totalDuration));
@@ -467,71 +485,16 @@ export function useTemporalSimulation({
       }
     });
     
-    // Logging para debug - mostrar detalles de vuelos con aeropuertos inválidos
-    if (flightsWithInvalidAirports > 0 && currentSimTime === 0) {
-      console.warn(
-        `[useTemporalSimulation] ${flightsWithInvalidAirports} vuelos tienen aeropuertos inválidos y serán omitidos`
-      );
-      
-      // Mostrar primeros 5 vuelos problemáticos
-      const problematicFlights = flightPairs
-        .filter(p => !p.departureEvent.idAeropuertoOrigen || !p.departureEvent.idAeropuertoDestino)
-        .slice(0, 5);
-      
-      console.group('🔍 Vuelos problemáticos (primeros 5):');
-      problematicFlights.forEach(pair => {
-        console.log({
-          flightId: pair.departureEvent.idVuelo,
-          flightCode: pair.departureEvent.codigoVuelo,
-          originAirportId: pair.departureEvent.idAeropuertoOrigen,
-          destAirportId: pair.departureEvent.idAeropuertoDestino,
-          originCity: pair.departureEvent.ciudadOrigen,
-          destCity: pair.departureEvent.ciudadDestino,
-        });
-      });
-      console.groupEnd();
-    }
+    // Logging comentado - vuelos con aeropuertos inválidos
+    // if (flightsWithInvalidAirports > 0 && currentSimTime === 0) {
+    //   console.warn(`[useTemporalSimulation] ${flightsWithInvalidAirports} vuelos inválidos`);
+    // }
     
     const activeFlightsList = Array.from(flightsMap.values());
     
-    // 🔍 DEBUG: Log cada 30 segundos de simulación
-    const shouldLog = Math.floor(currentSimTime) % 30 === 0 && currentSimTime > 0;
-    if (shouldLog) {
-      // Calcular estadísticas de agrupación
-      const totalPedidosAgrupados = activeFlightsList.reduce((acc, f) => acc + f.orderIds.length, 0);
-      const vuelosConMultiplesPedidos = activeFlightsList.filter(f => f.orderIds.length > 1).length;
-      
-      console.log(
-        `[useTemporalSimulation] ${currentSimTime}s: ${activeFlightsList.length} vuelos activos (${totalPedidosAgrupados} pedidos), ` +
-        `${vuelosConMultiplesPedidos} con múltiples pedidos, ${completedCount} completados, ${pendingCount} pendientes`
-      );
-    }
-    
-    // 🔍 DEBUG: Log al inicio
-    if (currentSimTime === 0 && flightPairs.length > 0) {
-      const uniquePhysicalFlights = new Set(
-        flightPairs.map(p => 
-          `${p.departureEvent.idVuelo}-${p.departureTime.getTime()}-${p.departureEvent.idAeropuertoOrigen}-${p.departureEvent.idAeropuertoDestino}`
-        )
-      );
-      
-      console.log(
-        `[useTemporalSimulation] INICIO - Total eventos: ${flightPairs.length}, Vuelos físicos únicos: ${uniquePhysicalFlights.size}`
-      );
-      
-      if (uniquePhysicalFlights.size < flightPairs.length) {
-        console.log(
-          `[useTemporalSimulation] ✅ AGRUPACIÓN ACTIVA: ${flightPairs.length - uniquePhysicalFlights.size} eventos serán combinados en vuelos existentes`
-        );
-      }
-      
-      console.log(
-        `[useTemporalSimulation] Hora inicio simulación: ${simulationStartTime.toISOString()}`
-      );
-      console.log(
-        `[useTemporalSimulation] Duración total: ${totalDurationSeconds / 60} minutos`
-      );
-    }
+    // Logs de simulación comentados para análisis de pickups
+    // const shouldLog = Math.floor(currentSimTime) % 30 === 0 && currentSimTime > 0;
+    // if (shouldLog) { console.log(...) }
     
     setActiveFlights(activeFlightsList);
     setCompletedOrdersCount(completedOrderIds.size);
@@ -541,29 +504,29 @@ export function useTemporalSimulation({
       pending: pendingCount,
     });
   }, [currentSimTime, flightPairs, simulationStartTime, orderFinalDestinations]);
-  
+
   // Actualizar almacenamiento de aeropuertos según eventos
   useEffect(() => {
     if (flightPairs.length === 0 || warehouseStorage.size === 0) return;
-    
+
     const currentDateTime = new Date(simulationStartTime.getTime() + currentSimTime * 1000);
     let storageChanged = false;
     const newStorage = new Map(warehouseStorage);
-    
+
     flightPairs.forEach(pair => {
-      const { departureEvent, departureTime, arrivalTime } = pair;
+      const { departureEvent, arrivalEvent, departureTime, arrivalTime } = pair;
       const cantidadProductos = departureEvent.cantidadProductos || 1;
       // Usar códigos IATA (nuevos campos) con fallback a los campos legacy
       const origenCode = departureEvent.codigoIATAOrigen || departureEvent.ciudadOrigen;
       const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino;
       const eventId = departureEvent.idEvento;
-      
+
       // DEPARTURE: Restar productos del aeropuerto origen
       const departureKey = `${eventId}-warehouse-departure`;
       if (
-        departureTime <= currentDateTime && 
-        origenCode &&
-        !processedWarehouseEventsRef.current.has(departureKey)
+          departureTime <= currentDateTime &&
+          origenCode &&
+          !processedWarehouseEventsRef.current.has(departureKey)
       ) {
         processedWarehouseEventsRef.current.add(departureKey);
         const origenState = newStorage.get(origenCode);
@@ -575,15 +538,15 @@ export function useTemporalSimulation({
           storageChanged = true;
         }
       }
-      
+
       // ARRIVAL: Sumar productos al aeropuerto destino
       const effectiveArrivalTime = arrivalTime || (departureTime ? new Date(departureTime.getTime() + 12 * 60 * 60 * 1000) : null);
       const arrivalKey = `${eventId}-warehouse-arrival`;
       if (
-        effectiveArrivalTime && 
-        effectiveArrivalTime <= currentDateTime &&
-        destinoCode &&
-        !processedWarehouseEventsRef.current.has(arrivalKey)
+          effectiveArrivalTime &&
+          effectiveArrivalTime <= currentDateTime &&
+          destinoCode &&
+          !processedWarehouseEventsRef.current.has(arrivalKey)
       ) {
         processedWarehouseEventsRef.current.add(arrivalKey);
         const destinoState = newStorage.get(destinoCode);
@@ -595,22 +558,47 @@ export function useTemporalSimulation({
           storageChanged = true;
         }
         
-        // Si es destino final (calculado por el backend), programar recogida en +2h
-        if (departureEvent.esDestinoFinal) {
+        // Solo programar pickup si es DESTINO FINAL (no escalas)
+        // Verificar usando el campo esDestinoFinal del arrivalEvent
+        const esDestinoFinal = arrivalEvent?.esDestinoFinal === true;
+        
+        if (esDestinoFinal) {
           const pickupTime = new Date(effectiveArrivalTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
-          pendingPickupsRef.current.push({
-            airportCode: destinoCode,
-            cantidad: cantidadProductos,
-            pickupTime,
-          });
+          const flightPickupKey = `scheduled-pickup-flight-${eventId}`;
+          
+          // Solo programar si no se ha programado antes para este vuelo
+          if (!processedWarehouseEventsRef.current.has(flightPickupKey)) {
+            processedWarehouseEventsRef.current.add(flightPickupKey);
+            pendingPickupsRef.current.push({
+              airportCode: destinoCode,
+              cantidad: cantidadProductos, // Toda la cantidad del vuelo
+              pickupTime,
+              flightEventId: eventId, // Usar eventId para hacer la recogida única
+            });
+            console.log(`[PICKUP] Programado vuelo ${eventId} (${cantidadProductos} productos) para recoger en ${destinoCode} a las ${pickupTime.toISOString()}`);
+          }
         }
       }
     });
     
-    // Procesar recogidas pendientes
+    // Procesar recogidas pendientes (cliente recoge +2h después de llegar a destino final)
     const remainingPickups: PendingPickup[] = [];
+    
+    // Solo loggear cuando hay pickups pendientes
+    if (pendingPickupsRef.current.length > 0) {
+      console.log(`[PICKUP-CHECK] ${pendingPickupsRef.current.length} pickups pendientes. Hora: ${currentDateTime.toISOString()}`);
+    }
+    
     pendingPickupsRef.current.forEach(pickup => {
-      if (pickup.pickupTime <= currentDateTime) {
+      // Key única por vuelo para evitar procesar el mismo vuelo dos veces
+      const pickupKey = `processed-pickup-flight-${pickup.flightEventId}`;
+      const yaLlegoHora = pickup.pickupTime <= currentDateTime;
+      const yaProcesado = processedWarehouseEventsRef.current.has(pickupKey);
+      
+      if (yaLlegoHora && !yaProcesado) {
+        processedWarehouseEventsRef.current.add(pickupKey);
+        console.log(`[PICKUP] ✅ Vuelo ${pickup.flightEventId} (${pickup.cantidad} productos) recogido en ${pickup.airportCode}`);
+        
         const airportState = newStorage.get(pickup.airportCode);
         if (airportState) {
           newStorage.set(pickup.airportCode, {
@@ -618,18 +606,37 @@ export function useTemporalSimulation({
             actual: Math.max(0, airportState.actual - pickup.cantidad),
           });
           storageChanged = true;
+          
+          // Disparar evento PICKUP para actualizar visualización
+          if (onFlightCapacityChangeRef.current) {
+            onFlightCapacityChangeRef.current({
+              eventType: 'PICKUP',
+              flightId: 0, // No aplica para pickup
+              airportId: 0, // Se usa airportCode en su lugar
+              airportCode: pickup.airportCode,
+              productIds: [],
+              totalVolume: pickup.cantidad,
+              timestamp: pickup.pickupTime,
+            });
+          }
         }
-      } else {
+      } else if (pickup.pickupTime > currentDateTime) {
         remainingPickups.push(pickup);
       }
+      // Si yaLlegoHora=true pero yaProcesado=true, simplemente se descarta (ya fue recogido)
     });
-    pendingPickupsRef.current = remainingPickups;
     
+    // Debug: mostrar si hubo cambios en la cola
+    if (pendingPickupsRef.current.length !== remainingPickups.length) {
+      console.log(`[PICKUP] Cola: ${pendingPickupsRef.current.length} → ${remainingPickups.length} pendientes`);
+    }
+    pendingPickupsRef.current = remainingPickups;
+
     if (storageChanged) {
       setWarehouseStorage(newStorage);
     }
   }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage]);
-  
+
   // Control de reproducción con interval
   useEffect(() => {
     if (isPlaying && timeline) {
@@ -641,7 +648,7 @@ export function useTemporalSimulation({
             setIsPlaying(false);
             return totalDurationSeconds;
           }
-          
+
           return newTime;
         });
       }, 200); // 200ms intervals - reduce carga para permitir interacción
@@ -649,14 +656,14 @@ export function useTemporalSimulation({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
   }, [isPlaying, playbackSpeed, totalDurationSeconds, timeline]);
-  
+
   // Controles
   const play = useCallback(() => {
     setCurrentSimTime(prev => {
@@ -666,22 +673,22 @@ export function useTemporalSimulation({
     });
     setIsPlaying(true);
   }, [totalDurationSeconds]);
-  
+
   const pause = useCallback(() => {
     setIsPlaying(false);
   }, []);
-  
+
   const reset = useCallback(() => {
     setIsPlaying(false);
     setCurrentSimTime(0);
-    
+
     // Limpiar eventos de capacidad procesados
     processedCapacityEventsRef.current.clear();
-    
+
     // Limpiar eventos de warehouse procesados y pickups pendientes
     processedWarehouseEventsRef.current.clear();
     pendingPickupsRef.current = [];
-    
+
     // Reinicializar almacenes a estado inicial
     if (aeropuertos && aeropuertos.length > 0) {
       const initialStorage = new Map<string, WarehouseState>();
@@ -694,11 +701,11 @@ export function useTemporalSimulation({
       setWarehouseStorage(initialStorage);
     }
   }, [aeropuertos]);
-  
+
   const seek = useCallback((seconds: number) => {
     setCurrentSimTime(Math.max(0, Math.min(totalDurationSeconds, seconds)));
   }, [totalDurationSeconds]);
-  
+
   // Formatear tiempo como "1d 12:30:45" o "12:30:45"
   const formatSimulationTime = useCallback((seconds: number): string => {
     const totalSeconds = Math.floor(seconds);
@@ -706,30 +713,25 @@ export function useTemporalSimulation({
     const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const secs = totalSeconds % 60;
-    
+
     if (days > 0) {
       return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
-    
+
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, []);
-  
+
   // Porcentaje de progreso
   const progressPercent = totalDurationSeconds > 0 
     ? (currentSimTime / totalDurationSeconds) * 100 
     : 0;
   
-  // Logging inicial
-  useEffect(() => {
-    if (timeline && flightPairs.length > 0) {
-      console.log('[useTemporalSimulation] Inicializado:', {
-        eventos: timeline.eventos?.length || 0,
-        pares: flightPairs.length,
-        duracion: `${(totalDurationSeconds / 60).toFixed(0)} minutos`,
-        velocidad: `1 seg real = ${timeUnit}`,
-      });
-    }
-  }, [timeline, flightPairs.length, totalDurationSeconds, timeUnit]);
+  // Logging inicial comentado
+  // useEffect(() => {
+  //   if (timeline && flightPairs.length > 0) {
+  //     console.log('[useTemporalSimulation] Inicializado:', {...});
+  //   }
+  // }, [timeline, flightPairs.length, totalDurationSeconds, timeUnit]);
   
   return {
     // Estado
@@ -743,15 +745,14 @@ export function useTemporalSimulation({
     flightStats,
     progressPercent,
     warehouseStorage,  // Estado de almacenes por aeropuerto
-    
+
     // Controles
     play,
     pause,
     reset,
     seek,
-    
+
     // Utilidades
     formatSimulationTime,
   };
 }
-

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { importAirports, importFlights, importOrders, importCancellations, importOrdersBatch } from '@/services/dataImport.service';
+import { importAirports, importFlights, importOrders, importOrdersBatch ,importCancellations,limpiarDataPrueba} from '@/services/dataImport.service';
 import { validateFileSize, validateFileType } from '@/services/fileUpload.service';
 import { SimulationFileType } from '@/types/fileUpload.types';
 import type {
@@ -81,7 +81,9 @@ export function useFileUpload() {
       const newState = { ...prev };
       delete newState[type.toLowerCase() as keyof UploadFilesState];
       // Limpiar validación si se eliminan todos los archivos
-      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0) && !newState.cancelaciones) {
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)
+          && !newState.cancelaciones) {
+
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
       } 
@@ -101,7 +103,8 @@ export function useFileUpload() {
       const newState = { ...prev, pedidos: newPedidos.length > 0 ? newPedidos : undefined };
       
       // Limpiar validación si se eliminan todos los archivos
-      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)) {
+      if (!newState.aeropuertos && !newState.vuelos && (!newState.pedidos || newState.pedidos.length === 0)
+        && !newState.cancelaciones) {
         newState.validationResponse = undefined;
         newState.sessionId = undefined;
       }
@@ -117,13 +120,19 @@ export function useFileUpload() {
    * @param horaFin Opcional: filtrar pedidos hasta esta hora (ISO 8601)
    */
   const validateFiles = async (
+    modoSimulacion: string,
     horaInicio?: string, 
-    horaFin?: string
+    horaFin?: string,
   ): Promise<FileUploadValidationResponse | null> => {
     setFilesState((prev) => ({ ...prev, isValidating: true }));
     setClientErrors([]);
     
     try {
+      // 🧹 LIMPIAR SIEMPRE LA BD AL INICIAR UNA IMPORTACIÓN
+      const clear = await limpiarDataPrueba();
+      if (!clear.success) {
+        throw new Error(`Error limpiando BD: ${clear.message}`);
+      }
       const results: string[] = [];
       let totalCount = 0;
       
@@ -153,7 +162,7 @@ export function useFileUpload() {
         
         if (pedidosFiles.length === 1) {
           // Un solo archivo: usar importación simple
-          const ordersResult = await importOrders(pedidosFiles[0], horaInicio, horaFin);
+          const ordersResult = await importOrders(pedidosFiles[0], modoSimulacion, horaInicio, horaFin);
           if (!ordersResult.success) {
             throw new Error(`Error al importar pedidos: ${ordersResult.message}`);
           }
@@ -164,7 +173,7 @@ export function useFileUpload() {
           results.push(message);
         } else {
           // Múltiples archivos: usar importación batch
-          const batchResult = await importOrdersBatch(pedidosFiles, horaInicio, horaFin);
+          const batchResult = await importOrdersBatch(pedidosFiles, modoSimulacion,horaInicio, horaFin);
           if (!batchResult.success) {
             throw new Error(`Error al importar pedidos en batch: ${batchResult.message}`);
           }
@@ -196,7 +205,7 @@ export function useFileUpload() {
         results.push(`✓ ${cancResult.count} cancelaciones importadas`);
         totalCount += cancResult.count || 0;
       }
-      
+
       const response: FileUploadValidationResponse = {
         success: true,
         message: results.join('\n'),
