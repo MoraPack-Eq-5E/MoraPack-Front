@@ -113,7 +113,7 @@ export interface RutaProductoDTO {
 
 export interface EventoLineaDeTiempoVueloDTO {
   idEvento: string;
-  tipoEvento: 'DEPARTURE' | 'ARRIVAL' | 'WAREHOUSE_TRANSFER';
+  tipoEvento: 'DEPARTURE' | 'ARRIVAL' | 'WAREHOUSE_TRANSFER' | 'IN_FLIGHT';
   horaEvento: string; // ISO datetime
   idVuelo?: number;
   codigoVuelo?: string;

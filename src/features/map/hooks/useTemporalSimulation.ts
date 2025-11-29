@@ -32,7 +32,7 @@ export interface ActiveFlight {
 }
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL' | 'PICKUP';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'IN_FLIGHT' | 'PICKUP';
   flightId: number;
   airportId: number;
   airportCode?: string; // Código IATA (para PICKUP)
@@ -313,6 +313,46 @@ export function useTemporalSimulation({
             arrivalTime,
           };
         });
+        //jesus
+      // .filter(event => event.tipoEvento === 'DEPARTURE' || event.tipoEvento === 'IN_FLIGHT')
+      // .map(departure => {
+      //   // Buscar ARRIVAL correspondiente por número de evento
+      //   const eventNumber = extractEventNumber(departure.idEvento);
+      //   const arrival = arrivalMap.get(eventNumber) || null;
+        
+      //   // NUEVO: Intentar usar tiempos reales del ALNS si están disponibles
+      //   const flightId = departure.idVuelo || 0;
+      //   const realTimes = flightRealTimes.get(flightId);
+        
+      //   // Priorizar tiempos reales del ALNS, luego eventos, luego null
+      //   let departureTime: Date;
+      //   let arrivalTime: Date | null;
+        
+      //   if (realTimes?.horaSalidaReal) {
+      //     // Usar tiempo real calculado por ALNS
+      //     departureTime = realTimes.horaSalidaReal;
+      //   } else {
+      //     // Fallback: usar hora del evento
+      //     departureTime = new Date(departure.horaEvento);
+      //   }
+        
+      //   if (realTimes?.horaLlegadaReal) {
+      //     // Usar tiempo real calculado por ALNS
+      //     arrivalTime = realTimes.horaLlegadaReal;
+      //   } else if (arrival) {
+      //     // Fallback: usar hora del evento de llegada
+      //     arrivalTime = new Date(arrival.horaEvento);
+      //   } else {
+      //     arrivalTime = null;
+      //   }
+        
+      //   return {
+      //     departureEvent: departure,
+      //     arrivalEvent: arrival,
+      //     departureTime,
+      //     arrivalTime,
+      //   };
+      // });
   }, [timeline, flightRealTimes]);
 
   // Actualizar vuelos activos según tiempo actual
@@ -334,6 +374,12 @@ export function useTemporalSimulation({
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
       const hasDeparted = departureTime <= currentDateTime;
+      //jesus
+      //const hasDeparted = departureTime <= currentDateTime;
+      // const hasDeparted = departureEvent.tipoEvento === 'IN_FLIGHT' 
+      //     ? true 
+      //     : departureTime <= currentDateTime;
+
 
       // Calcular arrival time efectivo (real o estimado)
       let effectiveArrivalTime = arrivalTime;

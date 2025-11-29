@@ -10,7 +10,7 @@ import { useAirportsForMap } from './useAirportsForMap';
 import type { Aeropuerto } from '@/types/map.types';
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL' | 'PICKUP'; // PICKUP = cliente recoge en destino final
+  eventType: 'DEPARTURE' | 'ARRIVAL'| 'IN_FLIGHT' | 'PICKUP'; // PICKUP = cliente recoge en destino final
   flightId: number;
   airportId: number;
   airportCode?: string; // Código IATA (para PICKUP)

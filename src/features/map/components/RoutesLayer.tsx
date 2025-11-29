@@ -67,47 +67,98 @@ export function RoutesLayer({
   const viewportBounds = useMemo(() => {
     if (!map) return null;
     return map.getBounds();
-  }, [map, forceUpdate]); // forceUpdate causa re-cálculo
+  }, [map]); // forceUpdate eliminado de las dependencias
 
   // Filtrar vuelos que tienen al menos un aeropuerto visible
   const visibleFlights = useMemo(() => {
     if (!viewportBounds) return [];
-    
+
     return flights.filter((flight) => {
-      const origin = airportsByCode[flight.originCode];
-      const destination = airportsByCode[flight.destinationCode];
-      
+      const originAirport = airportsByCode[flight.originCode];
+      const destinationAirport = airportsByCode[flight.destinationCode];
+
+      // Fallback: usar coordenadas embebidas en el flight cuando el aeropuerto no exista
+      const origin: LatLngTuple | null = originAirport
+        ? [originAirport.latitud, originAirport.longitud]
+        : (typeof flight.originLat === 'number' && typeof flight.originLon === 'number')
+          ? [flight.originLat, flight.originLon]
+          : null;
+
+      const destination: LatLngTuple | null = destinationAirport
+        ? [destinationAirport.latitud, destinationAirport.longitud]
+        : (typeof flight.destLat === 'number' && typeof flight.destLon === 'number')
+          ? [flight.destLat, flight.destLon]
+          : null;
+
       if (!origin || !destination) return false;
-      
+
       // Mostrar si origen o destino están en viewport
-      return (
-        viewportBounds.contains([origin.latitud, origin.longitud]) ||
-        viewportBounds.contains([destination.latitud, destination.longitud])
-      );
+      if (
+        viewportBounds.contains(origin) ||
+        viewportBounds.contains(destination)
+      ) {
+        return true;
+      }
+
+      // También mostrar si la posición actual del avión en la curva está dentro del viewport
+      try {
+        const ctrl = computeControlPoint(origin, destination, curvature);
+        const progress = Math.max(0, Math.min(1, flight.currentProgress));
+        const currentPos = bezierPoint(progress, origin, ctrl, destination);
+        if (viewportBounds.contains(currentPos)) return true;
+
+        // Finalmente, comprobar si el bounding box de la ruta intersecta el viewport
+        const originLatLng = L.latLng(origin[0], origin[1]);
+        const destLatLng = L.latLng(destination[0], destination[1]);
+        const routeBounds = L.latLngBounds([originLatLng, destLatLng]);
+        if (viewportBounds.intersects(routeBounds)) return true;
+      } catch (err) {
+        // Si hay un error en cálculos, no filter; mejor no excluir por fallo de cálculo
+        console.warn('[RoutesLayer] Error calculando visibilidad de ruta', err);
+        return true;
+      }
+
+      return false;
     });
-  }, [flights, airportsByCode, viewportBounds]);
+  }, [flights, airportsByCode, viewportBounds, curvature]);
 
   // Generar rutas con curvas Bezier
   const routes = useMemo(() => {
     return visibleFlights.map((flight) => {
-      const origin = airportsByCode[flight.originCode];
-      const destination = airportsByCode[flight.destinationCode];
-      
-      if (!origin || !destination) return null;
-      
-      const start: LatLngTuple = [origin.latitud, origin.longitud];
-      const end: LatLngTuple = [destination.latitud, destination.longitud];
-      const ctrl = computeControlPoint(start, end, curvature);
-      
+      const originAirport = airportsByCode[flight.originCode];
+      const destinationAirport = airportsByCode[flight.destinationCode];
+
+      const start: LatLngTuple | null = originAirport
+        ? [originAirport.latitud, originAirport.longitud]
+        : (typeof flight.originLat === 'number' && typeof flight.originLon === 'number')
+          ? [flight.originLat, flight.originLon]
+          : null;
+
+      const end: LatLngTuple | null = destinationAirport
+        ? [destinationAirport.latitud, destinationAirport.longitud]
+        : (typeof flight.destLat === 'number' && typeof flight.destLon === 'number')
+          ? [flight.destLat, flight.destLon]
+          : null;
+
+      if (!start || !end) return null;
+
+      // Si start y end son exactamente iguales, aplicar un pequeño offset para evitar una ruta degenerada
+      let adjustedEnd = end;
+      if (Math.abs(start[0] - end[0]) < 1e-9 && Math.abs(start[1] - end[1]) < 1e-9) {
+        adjustedEnd = [end[0] + 0.00005, end[1] + 0.00005];
+      }
+
+      const ctrl = computeControlPoint(start, adjustedEnd, curvature);
+
       // Generar 40 puntos para una curva suave (más puntos = línea punteada más suave)
       const samples = 40;
       const arc: LatLngTuple[] = [];
-      
+
       for (let i = 0; i <= samples; i++) {
         const t = i / samples;
-        arc.push(bezierPoint(t, start, ctrl, end));
+        arc.push(bezierPoint(t, start, ctrl, adjustedEnd));
       }
-      
+
       return {
         key: `route-${flight.eventId}`,
         positions: arc,
@@ -153,4 +204,3 @@ export function RoutesLayer({
     </>
   );
 }
-

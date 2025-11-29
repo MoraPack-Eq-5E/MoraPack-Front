@@ -31,6 +31,7 @@ export const SimulationFileType = {
 export type SimulationFileType = typeof SimulationFileType[keyof typeof SimulationFileType];
 
 
+
 /**
  * Resultado de validación para un archivo individual
  */

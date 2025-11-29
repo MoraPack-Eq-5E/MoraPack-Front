@@ -1,6 +1,6 @@
 /**
  * AnimatedFlightMarker - Marcador de avión animado con curvas Bezier
- * 
+ *
  * MEJORADO para usar:
  * - Curvas Bezier cuadráticas (más realistas)
  * - Rotación calculada desde tangente de la curva
@@ -92,7 +92,7 @@ export function AnimatedFlightMarker({
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const color = useMemo(() => {
     const capacityMax = flight.capacityMax || 300; // Capacidad estándar por defecto
-    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const capacityUsed = flight.capacityUsed ?? (flight.productIds ? flight.productIds.length : 0);
     const occupancyPercent = (capacityUsed / capacityMax) * 100;
 
     // Colores según imagen:
@@ -109,10 +109,11 @@ export function AnimatedFlightMarker({
     } else {
       return '#ef4444'; // Rojo (red-500)
     }
-  }, [flight.capacityMax, flight.capacityUsed, flight.productIds.length]);
+  }, [flight.capacityMax, flight.capacityUsed, flight.productIds]);
 
   // Calcular posición y rotación en la curva Bezier
   const currentState = useMemo(() => {
+    if (!bezierData) return null;
     const { start, ctrl, end } = bezierData;
     const progress = Math.max(0, Math.min(1, flight.currentProgress));
 
@@ -126,6 +127,7 @@ export function AnimatedFlightMarker({
   // Crear marker UNA SOLA VEZ cuando el componente se monta
   useEffect(() => {
     if (!map) return;
+    if (!currentState) return; // No hay coords válidas
 
     const { position, bearing } = currentState;
     const [lat, lng] = position;
