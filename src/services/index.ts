@@ -17,6 +17,10 @@ export * from './dataImport.service';
 // Servicios de simulación
 export * from './simulation.service';
 export * from './simulation-player.service';
+export * from './simulacionDiaria.service';
+
+// Servicios de almacenes
+export * from './almacen.service';
 
 // Servicios de archivos
 export * from './fileUpload.service';

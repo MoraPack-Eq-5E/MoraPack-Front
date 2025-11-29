@@ -4,5 +4,6 @@ export * from './useAirportsForMap';
 export * from './useSimulationEvents';
 export * from './useTemporalSimulation';
 export * from './useAirportCapacityManager';
+export * from './useAlmacenByAeropuerto';
 export type { LoadingStatus } from './useLiveFlights';
 export type { ActiveFlight, TimeUnit, FlightCapacityEvent } from './useTemporalSimulation';

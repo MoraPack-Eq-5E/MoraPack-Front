@@ -1,12 +1,15 @@
 /**
  * Hook para gestionar capacidades dinámicas de aeropuertos durante la simulación
- * Actualiza capacidades basándose en eventos de despegue y aterrizaje de vuelos
+ * Actualiza capacidades basándose en datos reales del backend + eventos de vuelo
  * 
- * Patrón seguido: morapack-frontend/src/hooks/useAirportCapacityManager.ts
+ * Combina:
+ * 1. Datos reales de almacenes desde backend (polling cada 1s)
+ * 2. Cambios locales por eventos de vuelo (UI inmediata)
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAirportsForMap } from './useAirportsForMap';
+import { useAlmacenes } from './useAlmacenByAeropuerto';
 import type { Aeropuerto } from '@/types/map.types';
 
 export interface FlightCapacityEvent {
@@ -21,15 +24,40 @@ export interface FlightCapacityEvent {
 /**
  * Hook para gestionar capacidades dinámicas de almacenes en aeropuertos
  */
-export function useAirportCapacityManager() {
-  // Obtener aeropuertos desde el backend
+export function useAirportCapacityManager(enableRealTimeUpdates = true) {
   const { airports: airportsFromDB, isLoading, error } = useAirportsForMap();
 
-  // Rastrear cambios dinámicos de capacidad durante la simulación
+  // Obtener almacenes reales con polling cada segundo
+  const { data: almacenesReales } = useAlmacenes({ 
+    enabled: enableRealTimeUpdates,
+  });
+
+  // Cambios locales por eventos de vuelo (para UI inmediata)
   const [capacityChanges, setCapacityChanges] = useState<Record<number, number>>({});
 
+  // Mapa de almacén por aeropuerto
+  const almacenesPorAeropuerto = useMemo(() => {
+    if (!almacenesReales || !airportsFromDB) return new Map();
+
+    const map = new Map();
+    almacenesReales.forEach((almacen) => {
+      const airport = airportsFromDB.find((a) => a.almacen?.id === almacen.id);
+      if (airport) {
+        map.set(airport.id, almacen);
+      }
+    });
+    return map;
+  }, [almacenesReales, airportsFromDB]);
+
+  // Reset cambios locales cuando llegan nuevos datos del backend
+  useEffect(() => {
+    if (almacenesReales && almacenesReales.length > 0) {
+      setCapacityChanges({});
+    }
+  }, [almacenesReales]);
+
   /**
-   * Convertir aeropuertos de BD a formato con capacidad dinámica
+   * Convertir aeropuertos con capacidades reales + cambios locales
    */
   const airports: Aeropuerto[] = useMemo(() => {
     if (!airportsFromDB || airportsFromDB.length === 0) {
@@ -37,17 +65,20 @@ export function useAirportCapacityManager() {
     }
 
     return airportsFromDB.map((airport) => {
-      const maxCapacity = airport.capMaxAlmacen || 1000;
-      const baseUsedCapacity = airport.cantActual || 0;
+      const almacenReal = almacenesPorAeropuerto.get(airport.id);
 
-      // Aplicar cambios dinámicos de simulación
+      // Usar datos del almacén real si están disponibles
+      const maxCapacity = almacenReal?.capacidadMaxima ?? airport.capMaxAlmacen ?? 1000;
+      const baseUsedCapacity = almacenReal?.capacidadUsada ?? airport.cantActual ?? 0;
+
+      // Aplicar cambios locales de eventos de vuelo
       const capacityChange = capacityChanges[airport.id] || 0;
       const currentUsedCapacity = Math.max(
         0,
         Math.min(maxCapacity, baseUsedCapacity + capacityChange)
       );
 
-      // Calcular porcentaje de capacidad
+      // Calcular porcentaje
       const capacityPercent = maxCapacity > 0 
         ? Math.round((currentUsedCapacity / maxCapacity) * 100) 
         : 0;
@@ -55,11 +86,11 @@ export function useAirportCapacityManager() {
       return {
         ...airport,
         cantActual: currentUsedCapacity,
-        // Agregar campo de porcentaje si no existe
+        capMaxAlmacen: maxCapacity,
         capacityPercent,
       } as Aeropuerto & { capacityPercent?: number };
     });
-  }, [airportsFromDB, capacityChanges]);
+  }, [airportsFromDB, almacenesPorAeropuerto, capacityChanges]);
 
   /**
    * Manejar despegue de vuelo - disminuye capacidad en aeropuerto origen
