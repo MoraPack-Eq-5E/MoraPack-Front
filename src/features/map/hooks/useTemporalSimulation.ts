@@ -635,7 +635,7 @@ export function useTemporalSimulation({
     if (isPlaying && timeline) {
       intervalRef.current = setInterval(() => {
         setCurrentSimTime(prev => {
-          const newTime = prev + playbackSpeed / 10; // Actualizar 10 veces por segundo
+          const newTime = prev + playbackSpeed / 5; // Actualizar 5 veces por segundo
           
           if (newTime >= totalDurationSeconds) {
             setIsPlaying(false);
@@ -644,7 +644,7 @@ export function useTemporalSimulation({
           
           return newTime;
         });
-      }, 100); // 100ms intervals
+      }, 200); // 200ms intervals - reduce carga para permitir interacción
     } else if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;

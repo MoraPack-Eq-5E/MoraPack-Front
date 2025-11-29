@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import { DivIcon } from 'leaflet';
 import type { Aeropuerto } from '@/types/map.types';
@@ -60,7 +61,7 @@ interface AirportMarkerProps {
     isSelected?: boolean;
 }
 
-export function AirportMarker({ airport, onClick, isSelected = false }: AirportMarkerProps) {
+export const AirportMarker = memo(function AirportMarker({ airport, onClick, isSelected = false }: AirportMarkerProps) {
     const isActive = airport.estado === 'DISPONIBLE';
     const isPrincipal = airport.isPrincipal ?? false;
     
@@ -96,6 +97,8 @@ export function AirportMarker({ airport, onClick, isSelected = false }: AirportM
                 click: handleClick,
             }}
             zIndexOffset={zIndexOffset}
+            interactive={true}
+            bubblingMouseEvents={false}
         >
             <Popup offset={[0, -10]}>
                 <div style={{minWidth: '220px', fontFamily: 'system-ui, sans-serif'}}>
@@ -122,4 +125,4 @@ export function AirportMarker({ airport, onClick, isSelected = false }: AirportM
             </Popup>
         </Marker>
     );
-}
+});

@@ -26,36 +26,46 @@ interface AnimatedFlightMarkerProps {
 }
 
 /**
- * Crea el ícono del avión con rotación usando imagen PNG
- * Optimizado para hardware acceleration
+ * Crea el ícono del avión con rotación
+ * Área de clic expandida (48x48) para facilitar interacción durante movimiento
  */
 function createPlaneIcon(bearing: number, color: string): DivIcon {
   // El SVG del avión apunta hacia el noreste en su diseño original
   // Necesitamos un offset de -45° para que apunte al norte cuando bearing = 0°
   const rotation = bearing - 45;
   
+  // Contenedor más grande (48x48) con el avión centrado (24x24)
   const planeHTML = `
-    <svg 
-      width="24" 
-      height="24" 
-      viewBox="0 0 128 128"
-      style="
-        display: block;
-        transform: rotate(${rotation}deg);
-        transform-origin: center center;
-        will-change: transform;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-      "
-    >
-      <path d="M119.7,18.2c7.8-7.8-3-17.9-10.7-10.3L80.7,36.3L15.8,19.2L5,30l53.5,28.2L36.8,79.8L20,77.7l-8.6,8.6l19.1,10l10,19.1l8.6-8.6l-2-16.7l21.6-21.6l27.6,53.2l10.8-10.8L90.8,47.2L119.7,18.2z" fill="${color}"/>
-    </svg>
+    <div style="
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    ">
+      <svg 
+        width="24" 
+        height="24" 
+        viewBox="0 0 128 128"
+        style="
+          display: block;
+          transform: rotate(${rotation}deg);
+          transform-origin: center center;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+          pointer-events: none;
+        "
+      >
+        <path d="M119.7,18.2c7.8-7.8-3-17.9-10.7-10.3L80.7,36.3L15.8,19.2L5,30l53.5,28.2L36.8,79.8L20,77.7l-8.6,8.6l19.1,10l10,19.1l8.6-8.6l-2-16.7l21.6-21.6l27.6,53.2l10.8-10.8L90.8,47.2L119.7,18.2z" fill="${color}"/>
+      </svg>
+    </div>
   `;
   
   return new DivIcon({ 
     html: planeHTML, 
     className: 'plane-icon', 
-    iconSize: [24, 24], 
-    iconAnchor: [12, 12] 
+    iconSize: [48, 48], 
+    iconAnchor: [24, 24] 
   });
 }
 
@@ -117,72 +127,68 @@ export function AnimatedFlightMarker({
     return { position, bearing };
   }, [bezierData, flight.currentProgress]);
 
-  // Crear/actualizar marker con Leaflet nativo
+  // Crear marker UNA SOLA VEZ cuando el componente se monta
   useEffect(() => {
     if (!map) return;
 
     const { position, bearing } = currentState;
     const [lat, lng] = position;
 
-    // Crear marker si no existe
-    if (!markerRef.current) {
-      const icon = createPlaneIcon(bearing, color);
-      const marker = L.marker([lat, lng], { 
-        icon, 
-        interactive: true,
-        zIndexOffset: 1000 
-      });
+    const icon = createPlaneIcon(bearing, color);
+    const marker = L.marker([lat, lng], { 
+      icon, 
+      interactive: true,
+      bubblingMouseEvents: false,
+      pane: 'markerPane', // Asegura que esté encima de las rutas
+      zIndexOffset: 1000 
+    });
 
-      // Usar capacityUsed directamente del objeto flight
-      const capacityUsed = flight.capacityUsed || flight.productIds.length;
-      const capacityMax = flight.capacityMax || 360;
-      const progressPercent = Math.round(flight.currentProgress * 100);
-      
-      // Contar pedidos agrupados en este vuelo
-      const numPedidos = flight.orderIds?.length || 1;
-      
-      // Usar el código de vuelo sin modificar (ya viene limpio del backend)
-      const cleanFlightCode = flight.flightCode;
-      
-      marker.bindPopup(`
-        <div style="min-width: 220px; font-family: system-ui, sans-serif;">
-          <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
-            ${cleanFlightCode}
-          </div>
-          <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
-            <div>${flight.originCode} → ${flight.destinationCode}</div>
-            <div>Progreso: ${progressPercent}%</div>
-            <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
-            <div>Num. Pedidos: ${numPedidos}</div>
-          </div>
+    // Usar capacityUsed directamente del objeto flight
+    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const capacityMax = flight.capacityMax || 360;
+    const progressPercent = Math.round(flight.currentProgress * 100);
+    
+    // Contar pedidos agrupados en este vuelo
+    const numPedidos = flight.orderIds?.length || 1;
+    
+    // Usar el código de vuelo sin modificar (ya viene limpio del backend)
+    const cleanFlightCode = flight.flightCode;
+    
+    marker.bindPopup(`
+      <div style="min-width: 220px; font-family: system-ui, sans-serif;">
+        <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
+          ${cleanFlightCode}
         </div>
-      `, { offset: [0, -10] });
+        <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
+          <div>${flight.originCode} → ${flight.destinationCode}</div>
+          <div>Progreso: ${progressPercent}%</div>
+          <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
+          <div>Num. Pedidos: ${numPedidos}</div>
+        </div>
+      </div>
+    `, { offset: [0, -10] });
 
-      marker.addTo(map);
-      markerRef.current = marker;
-    } else {
-      // Actualizar posición e icono
-      markerRef.current.setLatLng([lat, lng]);
-      markerRef.current.setIcon(createPlaneIcon(bearing, color));
-    }
+    marker.addTo(map);
+    markerRef.current = marker;
 
+    // Cleanup SOLO cuando el componente se desmonta
     return () => {
-      if (markerRef.current) {
-        map.removeLayer(markerRef.current);
-        markerRef.current = null;
-      }
+      map.removeLayer(marker);
+      markerRef.current = null;
     };
-  }, [map, currentState, color, flight]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]); // Solo depende de map - se crea una vez
 
-  // Cleanup al desmontar
+  // Actualizar posición e icono (SIN destruir el marcador)
   useEffect(() => {
-    return () => {
-      if (markerRef.current && map) {
-        map.removeLayer(markerRef.current);
-        markerRef.current = null;
-      }
-    };
-  }, [map]);
+    if (!markerRef.current) return;
+
+    const { position, bearing } = currentState;
+    const [lat, lng] = position;
+    
+    markerRef.current.setLatLng([lat, lng]);
+    markerRef.current.setIcon(createPlaneIcon(bearing, color));
+  }, [currentState, color]);
 
   return null; // Este componente no renderiza React, usa Leaflet nativo
 }
