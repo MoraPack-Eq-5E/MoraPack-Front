@@ -175,7 +175,7 @@ export function AnimatedFlightMarker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]); // Solo depende de map - se crea una vez
 
-  // Actualizar posición e icono (SIN destruir el marcador)
+  // Actualizar posición, icono y popup (SIN destruir el marcador)
   useEffect(() => {
     if (!markerRef.current) return;
 
@@ -184,7 +184,28 @@ export function AnimatedFlightMarker({
 
     markerRef.current.setLatLng([lat, lng]);
     markerRef.current.setIcon(createPlaneIcon(bearing, color));
-  }, [currentState, color]);
+    
+    // Actualizar contenido del popup con progreso actual
+    const capacityUsed = flight.capacityUsed || flight.productIds.length;
+    const capacityMax = flight.capacityMax || 360;
+    const progressPercent = Math.round(flight.currentProgress * 100);
+    const numPedidos = flight.orderIds?.length || 1;
+    const cleanFlightCode = flight.flightCode;
+    
+    markerRef.current.setPopupContent(`
+      <div style="min-width: 220px; font-family: system-ui, sans-serif;">
+        <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
+          ${cleanFlightCode}
+        </div>
+        <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
+          <div>${flight.originCode} → ${flight.destinationCode}</div>
+          <div>Progreso: ${progressPercent}%</div>
+          <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
+          <div>Num. Pedidos: ${numPedidos}</div>
+        </div>
+      </div>
+    `);
+  }, [currentState, color, flight]);
 
   return null; // Este componente no renderiza React, usa Leaflet nativo
 }

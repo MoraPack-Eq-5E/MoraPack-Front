@@ -10,9 +10,10 @@ import { useAirportsForMap } from './useAirportsForMap';
 import type { Aeropuerto } from '@/types/map.types';
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'PICKUP'; // PICKUP = cliente recoge en destino final
   flightId: number;
   airportId: number;
+  airportCode?: string; // Código IATA (para PICKUP)
   productIds: number[];
   totalVolume: number; // Volumen de productos en el vuelo (1 producto = 1 unidad)
   timestamp: Date;
@@ -90,7 +91,32 @@ export function useAirportCapacityManager() {
   }, []);
 
   /**
-   * Manejar evento de capacidad de vuelo (despegue o aterrizaje)
+   * Manejar recogida de cliente - disminuye capacidad en aeropuerto destino final (+2h después de llegada)
+   */
+  const handlePickup = useCallback((event: FlightCapacityEvent) => {
+    // Buscar aeropuerto por código IATA si no tenemos airportId
+    let airportId = event.airportId;
+    if (!airportId && event.airportCode && airportsFromDB) {
+      const airport = airportsFromDB.find(a => a.codigoIATA === event.airportCode);
+      if (airport) {
+        airportId = airport.id;
+      }
+    }
+
+    if (airportId) {
+      setCapacityChanges((prev) => ({
+        ...prev,
+        [airportId]: (prev[airportId] || 0) - event.totalVolume,
+      }));
+
+      console.log(
+        `[CAPACITY] 📦 Recogida en aeropuerto ${event.airportCode || airportId}: -${event.totalVolume} volumen (cliente recogió)`
+      );
+    }
+  }, [airportsFromDB]);
+
+  /**
+   * Manejar evento de capacidad de vuelo (despegue, aterrizaje o recogida)
    */
   const handleFlightCapacityEvent = useCallback(
     (event: FlightCapacityEvent) => {
@@ -98,9 +124,11 @@ export function useAirportCapacityManager() {
         handleDeparture(event);
       } else if (event.eventType === 'ARRIVAL') {
         handleArrival(event);
+      } else if (event.eventType === 'PICKUP') {
+        handlePickup(event);
       }
     },
-    [handleDeparture, handleArrival]
+    [handleDeparture, handleArrival, handlePickup]
   );
 
   /**

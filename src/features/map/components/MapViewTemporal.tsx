@@ -112,8 +112,6 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
     
-    console.log(`[MapViewTemporal] Renderizando ${flights.length} vuelos activos (agrupados)`);
-    
     return flights;
   }, [simulation.activeFlights, airports]);
 

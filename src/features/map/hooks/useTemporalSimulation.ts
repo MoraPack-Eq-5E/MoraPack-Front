@@ -32,9 +32,10 @@ export interface ActiveFlight {
 }
 
 export interface FlightCapacityEvent {
-  eventType: 'DEPARTURE' | 'ARRIVAL';
+  eventType: 'DEPARTURE' | 'ARRIVAL' | 'PICKUP';
   flightId: number;
   airportId: number;
+  airportCode?: string; // Código IATA (para PICKUP)
   productIds: number[];
   totalVolume: number;
   timestamp: Date;
@@ -65,6 +66,7 @@ interface PendingPickup {
   airportCode: string;
   cantidad: number;
   pickupTime: Date;
+  flightEventId: string; // ID del evento de vuelo para hacer cada recogida única
 }
 
 export type TimeUnit = 'seconds' | 'minutes' | 'hours' | 'days';
@@ -135,7 +137,7 @@ export function useTemporalSimulation({
         });
       });
       setWarehouseStorage(initialStorage);
-      console.log(`[useTemporalSimulation] Almacenes inicializados: ${initialStorage.size} aeropuertos`);
+      // console.log(`[useTemporalSimulation] Almacenes inicializados: ${initialStorage.size} aeropuertos`);
     }
   }, [aeropuertos]);
 
@@ -185,7 +187,10 @@ export function useTemporalSimulation({
     if (timeline?.rutasProductos) {
       timeline.rutasProductos.forEach(ruta => {
         if (!ruta.idPedido) return;
-
+        
+        // Si ya tenemos el destino para este pedido, no sobrescribir
+        if (map.has(ruta.idPedido)) return;
+        
         // Prioridad 1: usar codigoDestino de la ruta (destino final del pedido)
         if (ruta.codigoDestino) {
           map.set(ruta.idPedido, ruta.codigoDestino);
@@ -195,16 +200,28 @@ export function useTemporalSimulation({
         // Prioridad 2: usar el destino del último vuelo de la ruta
         if (ruta.vuelos && ruta.vuelos.length > 0) {
           const ultimoVuelo = ruta.vuelos[ruta.vuelos.length - 1];
-          // Intentar codigoDestino, luego horaLlegadaReal info
           const destino = ultimoVuelo.codigoDestino;
           if (destino) {
             map.set(ruta.idPedido, destino);
             return;
           }
         }
-
       });
-
+    }
+    
+    // También extraer destinos de los eventos con esDestinoFinal=true
+    if (timeline?.eventos) {
+      timeline.eventos.forEach(evento => {
+        if (evento.tipoEvento === 'ARRIVAL' && evento.esDestinoFinal && evento.codigoIATADestino) {
+          // Para cada pedido en este evento que llega a destino final
+          const pedidos = evento.idsPedidos || (evento.idPedido ? [evento.idPedido] : []);
+          pedidos.forEach(idPedido => {
+            if (!map.has(idPedido)) {
+              map.set(idPedido, evento.codigoIATADestino!);
+            }
+          });
+        }
+      });
     }
 
     return map;
@@ -313,8 +330,7 @@ export function useTemporalSimulation({
 
     let completedCount = 0;
     let pendingCount = 0;
-    let flightsWithInvalidAirports = 0;
-
+    
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
       const hasDeparted = departureTime <= currentDateTime;
@@ -412,8 +428,7 @@ export function useTemporalSimulation({
             departureEvent.idAeropuertoDestino;
 
         if (!hasValidAirports) {
-          flightsWithInvalidAirports++;
-          return; // Skip
+          return; // Skip vuelos sin aeropuertos válidos
         }
 
         const totalDuration = effectiveArrivalTime.getTime() - departureTime.getTime();
@@ -469,73 +484,18 @@ export function useTemporalSimulation({
         pendingCount++;
       }
     });
-
-    // Logging para debug - mostrar detalles de vuelos con aeropuertos inválidos
-    if (flightsWithInvalidAirports > 0 && currentSimTime === 0) {
-      console.warn(
-          `[useTemporalSimulation] ${flightsWithInvalidAirports} vuelos tienen aeropuertos inválidos y serán omitidos`
-      );
-
-      // Mostrar primeros 5 vuelos problemáticos
-      const problematicFlights = flightPairs
-          .filter(p => !p.departureEvent.idAeropuertoOrigen || !p.departureEvent.idAeropuertoDestino)
-          .slice(0, 5);
-
-      console.group('🔍 Vuelos problemáticos (primeros 5):');
-      problematicFlights.forEach(pair => {
-        console.log({
-          flightId: pair.departureEvent.idVuelo,
-          flightCode: pair.departureEvent.codigoVuelo,
-          originAirportId: pair.departureEvent.idAeropuertoOrigen,
-          destAirportId: pair.departureEvent.idAeropuertoDestino,
-          originCity: pair.departureEvent.ciudadOrigen,
-          destCity: pair.departureEvent.ciudadDestino,
-        });
-      });
-      console.groupEnd();
-    }
-
+    
+    // Logging comentado - vuelos con aeropuertos inválidos
+    // if (flightsWithInvalidAirports > 0 && currentSimTime === 0) {
+    //   console.warn(`[useTemporalSimulation] ${flightsWithInvalidAirports} vuelos inválidos`);
+    // }
+    
     const activeFlightsList = Array.from(flightsMap.values());
-
-    // 🔍 DEBUG: Log cada 30 segundos de simulación
-    const shouldLog = Math.floor(currentSimTime) % 30 === 0 && currentSimTime > 0;
-    if (shouldLog) {
-      // Calcular estadísticas de agrupación
-      const totalPedidosAgrupados = activeFlightsList.reduce((acc, f) => acc + f.orderIds.length, 0);
-      const vuelosConMultiplesPedidos = activeFlightsList.filter(f => f.orderIds.length > 1).length;
-      
-      console.log(
-        `[useTemporalSimulation] ${currentSimTime}s: ${activeFlightsList.length} vuelos activos (${totalPedidosAgrupados} pedidos), ` +
-        `${vuelosConMultiplesPedidos} con múltiples pedidos, ${completedCount} completados, ${pendingCount} pendientes`
-      );
-    }
-
-    // 🔍 DEBUG: Log al inicio
-    if (currentSimTime === 0 && flightPairs.length > 0) {
-      const uniquePhysicalFlights = new Set(
-        flightPairs.map(p => 
-          `${p.departureEvent.idVuelo}-${p.departureTime.getTime()}-${p.departureEvent.idAeropuertoOrigen}-${p.departureEvent.idAeropuertoDestino}`
-        )
-      );
-      
-      console.log(
-        `[useTemporalSimulation] INICIO - Total eventos: ${flightPairs.length}, Vuelos físicos únicos: ${uniquePhysicalFlights.size}`
-      );
-      
-      if (uniquePhysicalFlights.size < flightPairs.length) {
-        console.log(
-          `[useTemporalSimulation] ✅ AGRUPACIÓN ACTIVA: ${flightPairs.length - uniquePhysicalFlights.size} eventos serán combinados en vuelos existentes`
-        );
-      }
-      
-      console.log(
-          `[useTemporalSimulation] Hora inicio simulación: ${simulationStartTime.toISOString()}`
-      );
-      console.log(
-          `[useTemporalSimulation] Duración total: ${totalDurationSeconds / 60} minutos`
-      );
-    }
-
+    
+    // Logs de simulación comentados para análisis de pickups
+    // const shouldLog = Math.floor(currentSimTime) % 30 === 0 && currentSimTime > 0;
+    // if (shouldLog) { console.log(...) }
+    
     setActiveFlights(activeFlightsList);
     setCompletedOrdersCount(completedOrderIds.size);
     setFlightStats({
@@ -554,7 +514,7 @@ export function useTemporalSimulation({
     const newStorage = new Map(warehouseStorage);
 
     flightPairs.forEach(pair => {
-      const { departureEvent, departureTime, arrivalTime } = pair;
+      const { departureEvent, arrivalEvent, departureTime, arrivalTime } = pair;
       const cantidadProductos = departureEvent.cantidadProductos || 1;
       // Usar códigos IATA (nuevos campos) con fallback a los campos legacy
       const origenCode = departureEvent.codigoIATAOrigen || departureEvent.ciudadOrigen;
@@ -597,23 +557,48 @@ export function useTemporalSimulation({
           });
           storageChanged = true;
         }
-
-        // Si es destino final (calculado por el backend), programar recogida en +2h
-        if (departureEvent.esDestinoFinal) {
+        
+        // Solo programar pickup si es DESTINO FINAL (no escalas)
+        // Verificar usando el campo esDestinoFinal del arrivalEvent
+        const esDestinoFinal = arrivalEvent?.esDestinoFinal === true;
+        
+        if (esDestinoFinal) {
           const pickupTime = new Date(effectiveArrivalTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
-          pendingPickupsRef.current.push({
-            airportCode: destinoCode,
-            cantidad: cantidadProductos,
-            pickupTime,
-          });
+          const flightPickupKey = `scheduled-pickup-flight-${eventId}`;
+          
+          // Solo programar si no se ha programado antes para este vuelo
+          if (!processedWarehouseEventsRef.current.has(flightPickupKey)) {
+            processedWarehouseEventsRef.current.add(flightPickupKey);
+            pendingPickupsRef.current.push({
+              airportCode: destinoCode,
+              cantidad: cantidadProductos, // Toda la cantidad del vuelo
+              pickupTime,
+              flightEventId: eventId, // Usar eventId para hacer la recogida única
+            });
+            console.log(`[PICKUP] Programado vuelo ${eventId} (${cantidadProductos} productos) para recoger en ${destinoCode} a las ${pickupTime.toISOString()}`);
+          }
         }
       }
     });
-
-    // Procesar recogidas pendientes
+    
+    // Procesar recogidas pendientes (cliente recoge +2h después de llegar a destino final)
     const remainingPickups: PendingPickup[] = [];
+    
+    // Solo loggear cuando hay pickups pendientes
+    if (pendingPickupsRef.current.length > 0) {
+      console.log(`[PICKUP-CHECK] ${pendingPickupsRef.current.length} pickups pendientes. Hora: ${currentDateTime.toISOString()}`);
+    }
+    
     pendingPickupsRef.current.forEach(pickup => {
-      if (pickup.pickupTime <= currentDateTime) {
+      // Key única por vuelo para evitar procesar el mismo vuelo dos veces
+      const pickupKey = `processed-pickup-flight-${pickup.flightEventId}`;
+      const yaLlegoHora = pickup.pickupTime <= currentDateTime;
+      const yaProcesado = processedWarehouseEventsRef.current.has(pickupKey);
+      
+      if (yaLlegoHora && !yaProcesado) {
+        processedWarehouseEventsRef.current.add(pickupKey);
+        console.log(`[PICKUP] ✅ Vuelo ${pickup.flightEventId} (${pickup.cantidad} productos) recogido en ${pickup.airportCode}`);
+        
         const airportState = newStorage.get(pickup.airportCode);
         if (airportState) {
           newStorage.set(pickup.airportCode, {
@@ -621,11 +606,30 @@ export function useTemporalSimulation({
             actual: Math.max(0, airportState.actual - pickup.cantidad),
           });
           storageChanged = true;
+          
+          // Disparar evento PICKUP para actualizar visualización
+          if (onFlightCapacityChangeRef.current) {
+            onFlightCapacityChangeRef.current({
+              eventType: 'PICKUP',
+              flightId: 0, // No aplica para pickup
+              airportId: 0, // Se usa airportCode en su lugar
+              airportCode: pickup.airportCode,
+              productIds: [],
+              totalVolume: pickup.cantidad,
+              timestamp: pickup.pickupTime,
+            });
+          }
         }
-      } else {
+      } else if (pickup.pickupTime > currentDateTime) {
         remainingPickups.push(pickup);
       }
+      // Si yaLlegoHora=true pero yaProcesado=true, simplemente se descarta (ya fue recogido)
     });
+    
+    // Debug: mostrar si hubo cambios en la cola
+    if (pendingPickupsRef.current.length !== remainingPickups.length) {
+      console.log(`[PICKUP] Cola: ${pendingPickupsRef.current.length} → ${remainingPickups.length} pendientes`);
+    }
     pendingPickupsRef.current = remainingPickups;
 
     if (storageChanged) {
@@ -718,22 +722,17 @@ export function useTemporalSimulation({
   }, []);
 
   // Porcentaje de progreso
-  const progressPercent = totalDurationSeconds > 0
-      ? (currentSimTime / totalDurationSeconds) * 100
-      : 0;
-
-  // Logging inicial
-  useEffect(() => {
-    if (timeline && flightPairs.length > 0) {
-      console.log('[useTemporalSimulation] Inicializado:', {
-        eventos: timeline.eventos?.length || 0,
-        pares: flightPairs.length,
-        duracion: `${(totalDurationSeconds / 60).toFixed(0)} minutos`,
-        velocidad: `1 seg real = ${timeUnit}`,
-      });
-    }
-  }, [timeline, flightPairs.length, totalDurationSeconds, timeUnit]);
-
+  const progressPercent = totalDurationSeconds > 0 
+    ? (currentSimTime / totalDurationSeconds) * 100 
+    : 0;
+  
+  // Logging inicial comentado
+  // useEffect(() => {
+  //   if (timeline && flightPairs.length > 0) {
+  //     console.log('[useTemporalSimulation] Inicializado:', {...});
+  //   }
+  // }, [timeline, flightPairs.length, totalDurationSeconds, timeUnit]);
+  
   return {
     // Estado
     isPlaying,
