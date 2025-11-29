@@ -75,8 +75,8 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
   const canvasRenderer = useMemo(() => L.canvas(), []);
 
   // Convertir ActiveFlight a formato para AnimatedFlightMarker
-  // IMPORTANTE: Usar eventId como clave única (no flightId) porque el mismo vuelo físico
-  // puede usarse en diferentes días/horas y cada instancia debe mostrarse como un avión separado
+  // Los vuelos ya vienen agrupados por vuelo físico desde useTemporalSimulation
+  // (múltiples pedidos en el mismo vuelo se muestran como UN solo avión)
   const flightsForRender = useMemo(() => {
     const flights = simulation.activeFlights.map(flight => {
       const origin = airports.find(a => a.id === flight.originAirportId);
@@ -88,7 +88,7 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
       }
 
       return {
-        eventId: flight.eventId, // Usar eventId como clave única
+        eventId: flight.eventId, // Clave física del vuelo (agrupa pedidos del mismo vuelo)
         flightId: flight.flightId,
         flightCode: flight.flightCode,
         originCode: origin.codigoIATA || '',
@@ -96,8 +96,8 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
         departureTime: flight.departureTime,
         arrivalTime: flight.arrivalTime,
         currentProgress: flight.progress,
-        productIds: [flight.productId],
-        orderIds: [flight.orderId],
+        productIds: flight.productIds, // Todos los productos en este vuelo
+        orderIds: flight.orderIds,     // Todos los pedidos en este vuelo
         originLat: origin.latitud,
         originLon: origin.longitud,
         destLat: dest.latitud,
@@ -105,12 +105,12 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
         originAirportId: flight.originAirportId,
         destinationAirportId: flight.destinationAirportId,
         capacityMax: flight.capacityMax || 100,
-        capacityUsed: flight.cantidadProductos || 1,
+        capacityUsed: flight.cantidadProductos || flight.orderIds.length,
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
-
-    console.log(`[MapViewTemporal] Renderizando ${flights.length} vuelos activos`);
-
+    
+    console.log(`[MapViewTemporal] Renderizando ${flights.length} vuelos activos (agrupados)`);
+    
     return flights;
   }, [simulation.activeFlights, airports]);
 

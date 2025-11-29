@@ -45,7 +45,7 @@ export function RoutesLayer({
     return dict;
   }, [airports]);
 
-  // Re-render cuando el mapa se mueve (inmediato para evitar desalineación)
+  // Re-render solo cuando termina el movimiento/zoom (evita parpadeo durante zoom)
   useEffect(() => {
     if (!map) return;
 
@@ -53,15 +53,13 @@ export function RoutesLayer({
       forceUpdate(x => x + 1);
     };
 
-    // Escuchar todos los eventos relevantes para sincronización perfecta
+    // Solo escuchar eventos de FIN de movimiento/zoom
     map.on('moveend', onMove);
     map.on('zoomend', onMove);
-    map.on('zoom', onMove); // También durante el zoom para mejor sincronización
     
     return () => {
       map.off('moveend', onMove);
       map.off('zoomend', onMove);
-      map.off('zoom', onMove);
     };
   }, [map]);
 

@@ -68,7 +68,6 @@ export function AnimatedFlightMarker({
 }: AnimatedFlightMarkerProps) {
   const map = useMap();
   const markerRef = useRef<LeafletMarker | null>(null);
-  const lastUpdateRef = useRef<{ progress: number; lat: number; lng: number } | null>(null);
 
   // Validar coordenadas
   if (!flight.originLat || !flight.originLon || !flight.destLat || !flight.destLon) {
@@ -120,27 +119,12 @@ export function AnimatedFlightMarker({
     return { position, bearing };
   }, [bezierData, flight.currentProgress]);
 
-  // Crear/actualizar marker con Leaflet nativo para mejor performance
+  // Crear/actualizar marker con Leaflet nativo
   useEffect(() => {
     if (!map) return;
 
     const { position, bearing } = currentState;
     const [lat, lng] = position;
-
-    // Throttle: solo actualizar si cambió significativamente
-    // Reducido para mejor sincronización con zoom
-    if (lastUpdateRef.current) {
-      const distLat = Math.abs(lat - lastUpdateRef.current.lat);
-      const distLng = Math.abs(lng - lastUpdateRef.current.lng);
-      const distProgress = Math.abs(flight.currentProgress - lastUpdateRef.current.progress);
-      
-      // Si el cambio es muy pequeño, skip (umbrales reducidos)
-      if (distLat < 0.0001 && distLng < 0.0001 && distProgress < 0.005) {
-        return;
-      }
-    }
-
-    lastUpdateRef.current = { progress: flight.currentProgress, lat, lng };
 
     // Crear marker si no existe
     if (!markerRef.current) {
@@ -156,20 +140,22 @@ export function AnimatedFlightMarker({
       const capacityMax = flight.capacityMax || 360;
       const progressPercent = Math.round(flight.currentProgress * 100);
       
+      // Contar pedidos agrupados en este vuelo
+      const numPedidos = flight.orderIds?.length || 1;
+      
       // Usar el código de vuelo sin modificar (ya viene limpio del backend)
       const cleanFlightCode = flight.flightCode;
       
-      // Popup profesional sin emojis
       marker.bindPopup(`
-        <div style="min-width: 200px; font-family: system-ui, sans-serif;">
+        <div style="min-width: 220px; font-family: system-ui, sans-serif;">
           <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
             ${cleanFlightCode}
           </div>
           <div style="font-size: 12px; color: #4b5563; line-height: 1.8;">
             <div>${flight.originCode} → ${flight.destinationCode}</div>
-            <div>Estado: <span style="color: #059669; font-weight: 500;">IN_FLIGHT</span></div>
             <div>Progreso: ${progressPercent}%</div>
             <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
+            <div>Num. Pedidos: ${numPedidos}</div>
           </div>
         </div>
       `, { offset: [0, -10] });

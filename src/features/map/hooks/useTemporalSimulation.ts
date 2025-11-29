@@ -20,6 +20,8 @@ export interface ActiveFlight {
   flightCode: string;
   productId: number;
   orderId: number;
+  productIds: number[];
+  orderIds: number[];
   originAirportId: number;
   destinationAirportId: number;
   departureTime: Date;
@@ -414,24 +416,51 @@ export function useTemporalSimulation({
         const totalDuration = effectiveArrivalTime.getTime() - departureTime.getTime();
         const elapsed = currentDateTime.getTime() - departureTime.getTime();
         const progress = Math.max(0, Math.min(1, elapsed / totalDuration));
-
-        // Usar idEvento como clave única (cada instancia de vuelo es diferente)
-        const flightKey = departureEvent.idEvento;
-
-        flightsMap.set(flightKey, {
-          eventId: departureEvent.idEvento, // ID único del evento
-          flightId: departureEvent.idVuelo || 0,
-          flightCode: departureEvent.codigoVuelo || 'N/A',
-          productId: departureEvent.idProducto || 0,
-          orderId: departureEvent.idPedido || 0,
-          originAirportId: departureEvent.idAeropuertoOrigen || 0,
-          destinationAirportId: departureEvent.idAeropuertoDestino || 0,
-          departureTime,
-          arrivalTime: effectiveArrivalTime,
-          progress,
-          capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
-          cantidadProductos: departureEvent.cantidadProductos, // Cantidad de productos
-        });
+        
+        const flightPhysicalKey = `${departureEvent.idVuelo}-${departureTime.getTime()}-${departureEvent.idAeropuertoOrigen}-${departureEvent.idAeropuertoDestino}`;
+        
+        // Extraer pedidos y productos de este evento
+        const eventProductIds = departureEvent.idProducto ? [departureEvent.idProducto] : [];
+        const eventOrderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
+          ? departureEvent.idsPedidos
+          : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
+        
+        // Verificar si ya existe un vuelo con esta clave física
+        const existingFlight = flightsMap.get(flightPhysicalKey);
+        
+        if (existingFlight) {
+          // Agregar pedidos y productos a vuelo existente (sin duplicados)
+          eventProductIds.forEach(pid => {
+            if (!existingFlight.productIds.includes(pid)) {
+              existingFlight.productIds.push(pid);
+            }
+          });
+          eventOrderIds.forEach(oid => {
+            if (!existingFlight.orderIds.includes(oid)) {
+              existingFlight.orderIds.push(oid);
+            }
+          });
+          // Sumar cantidad de productos
+          existingFlight.cantidadProductos = (existingFlight.cantidadProductos || 0) + (departureEvent.cantidadProductos || 1);
+        } else {
+          // Crear nuevo vuelo
+          flightsMap.set(flightPhysicalKey, {
+            eventId: flightPhysicalKey, // Usar clave física como eventId
+            flightId: departureEvent.idVuelo || 0,
+            flightCode: departureEvent.codigoVuelo || 'N/A',
+            productId: departureEvent.idProducto || 0,
+            orderId: departureEvent.idPedido || 0,
+            productIds: eventProductIds,
+            orderIds: eventOrderIds,
+            originAirportId: departureEvent.idAeropuertoOrigen || 0,
+            destinationAirportId: departureEvent.idAeropuertoDestino || 0,
+            departureTime,
+            arrivalTime: effectiveArrivalTime,
+            progress,
+            capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
+            cantidadProductos: departureEvent.cantidadProductos || 1, // Cantidad de productos
+          });
+        }
       } else {
         // ⏳ Vuelo pendiente
         pendingCount++;
@@ -468,16 +497,34 @@ export function useTemporalSimulation({
     // 🔍 DEBUG: Log cada 30 segundos de simulación
     const shouldLog = Math.floor(currentSimTime) % 30 === 0 && currentSimTime > 0;
     if (shouldLog) {
+      // Calcular estadísticas de agrupación
+      const totalPedidosAgrupados = activeFlightsList.reduce((acc, f) => acc + f.orderIds.length, 0);
+      const vuelosConMultiplesPedidos = activeFlightsList.filter(f => f.orderIds.length > 1).length;
+      
       console.log(
-          `[useTemporalSimulation] ${currentSimTime}s: ${activeFlightsList.length} activos, ${completedCount} completados, ${pendingCount} pendientes`
+        `[useTemporalSimulation] ${currentSimTime}s: ${activeFlightsList.length} vuelos activos (${totalPedidosAgrupados} pedidos), ` +
+        `${vuelosConMultiplesPedidos} con múltiples pedidos, ${completedCount} completados, ${pendingCount} pendientes`
       );
     }
 
     // 🔍 DEBUG: Log al inicio
     if (currentSimTime === 0 && flightPairs.length > 0) {
-      console.log(
-          `[useTemporalSimulation] INICIO - Total pares de vuelo: ${flightPairs.length}`
+      const uniquePhysicalFlights = new Set(
+        flightPairs.map(p => 
+          `${p.departureEvent.idVuelo}-${p.departureTime.getTime()}-${p.departureEvent.idAeropuertoOrigen}-${p.departureEvent.idAeropuertoDestino}`
+        )
       );
+      
+      console.log(
+        `[useTemporalSimulation] INICIO - Total eventos: ${flightPairs.length}, Vuelos físicos únicos: ${uniquePhysicalFlights.size}`
+      );
+      
+      if (uniquePhysicalFlights.size < flightPairs.length) {
+        console.log(
+          `[useTemporalSimulation] ✅ AGRUPACIÓN ACTIVA: ${flightPairs.length - uniquePhysicalFlights.size} eventos serán combinados en vuelos existentes`
+        );
+      }
+      
       console.log(
           `[useTemporalSimulation] Hora inicio simulación: ${simulationStartTime.toISOString()}`
       );
