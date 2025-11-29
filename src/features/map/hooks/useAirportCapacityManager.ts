@@ -71,7 +71,7 @@ export function useAirportCapacityManager() {
     }));
 
     console.log(
-      `[CAPACITY] ✈️ Despegue desde aeropuerto ${event.airportId}: -${event.totalVolume} volumen (${event.productIds.length} productos)`
+        `[CAPACITY] ✈️ Despegue desde aeropuerto ${event.airportId}: -${event.totalVolume} volumen (${event.productIds.length} productos)`
     );
   }, []);
 
@@ -85,7 +85,7 @@ export function useAirportCapacityManager() {
     }));
 
     console.log(
-      `[CAPACITY] 🛬 Aterrizaje en aeropuerto ${event.airportId}: +${event.totalVolume} volumen (${event.productIds.length} productos)`
+        `[CAPACITY] 🛬 Aterrizaje en aeropuerto ${event.airportId}: +${event.totalVolume} volumen (${event.productIds.length} productos)`
     );
   }, []);
 

@@ -357,6 +357,7 @@ export function useTemporalSimulation({
             totalVolume: totalVolume,
             timestamp: departureTime, // Usar tiempo de despegue real
           });
+
         }
       }
 
@@ -399,6 +400,8 @@ export function useTemporalSimulation({
             totalVolume: totalVolume,
             timestamp: effectiveArrivalTime, // Usar tiempo de llegada real
           });
+
+
         }
       } else if (hasDeparted && effectiveArrivalTime) {
         // ✈️ Vuelo en progreso
