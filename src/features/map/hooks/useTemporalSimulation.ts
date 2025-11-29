@@ -66,7 +66,7 @@ interface PendingPickup {
   airportCode: string;
   cantidad: number;
   pickupTime: Date;
-  idPedido: number; // ID del pedido para hacer cada recogida única
+  flightEventId: string; // ID del evento de vuelo para hacer cada recogida única
 }
 
 export type TimeUnit = 'seconds' | 'minutes' | 'hours' | 'days';
@@ -330,7 +330,6 @@ export function useTemporalSimulation({
     
     let completedCount = 0;
     let pendingCount = 0;
-    let flightsWithInvalidAirports = 0;
     
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
@@ -426,8 +425,7 @@ export function useTemporalSimulation({
           departureEvent.idAeropuertoDestino;
         
         if (!hasValidAirports) {
-          flightsWithInvalidAirports++;
-          return; // Skip
+          return; // Skip vuelos sin aeropuertos válidos
         }
         
         const totalDuration = effectiveArrivalTime.getTime() - departureTime.getTime();
@@ -557,43 +555,25 @@ export function useTemporalSimulation({
           storageChanged = true;
         }
         
-        // Programar recogidas individuales para cada pedido que llegó a su destino FINAL
-        // Usar pedidos del departureEvent (más completo) con fallback al arrivalEvent
-        const pedidosEnVuelo = departureEvent.idsPedidos || 
-          arrivalEvent?.idsPedidos || 
-          (departureEvent.idPedido ? [departureEvent.idPedido] : 
-          (arrivalEvent?.idPedido ? [arrivalEvent.idPedido] : []));
+        // Solo programar pickup si es DESTINO FINAL (no escalas)
+        // Verificar usando el campo esDestinoFinal del arrivalEvent
+        const esDestinoFinal = arrivalEvent?.esDestinoFinal === true;
         
-        let pedidosConDestinoFinal = 0;
-        pedidosEnVuelo.forEach(idPedido => {
-          const destinoFinalPedido = orderFinalDestinations.get(idPedido);
+        if (esDestinoFinal) {
+          const pickupTime = new Date(effectiveArrivalTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
+          const flightPickupKey = `scheduled-pickup-flight-${eventId}`;
           
-          // Si el destino de este vuelo es el destino final del pedido, programar recogida
-          // Normalizar códigos para comparación (trim + uppercase)
-          const destinoNormalizado = destinoCode?.trim().toUpperCase();
-          const destinoFinalNormalizado = destinoFinalPedido?.trim().toUpperCase();
-          
-          if (destinoFinalNormalizado && destinoNormalizado && destinoFinalNormalizado === destinoNormalizado) {
-            const pickupTime = new Date(effectiveArrivalTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
-            const scheduleKey = `scheduled-pickup-${idPedido}`;
-            
-            // Solo programar si no se ha programado antes para este pedido
-            if (!processedWarehouseEventsRef.current.has(scheduleKey)) {
-              processedWarehouseEventsRef.current.add(scheduleKey);
-              pendingPickupsRef.current.push({
-                airportCode: destinoCode,
-                cantidad: 1, // 1 unidad por pedido (cada cliente recoge su pedido)
-                pickupTime,
-                idPedido, // Guardar ID para hacer la recogida única
-              });
-              pedidosConDestinoFinal++; // Contar SOLO los realmente programados
-              console.log(`[PICKUP] Programado pedido ${idPedido} para recoger en ${destinoCode} a las ${pickupTime.toISOString()}`);
-            }
+          // Solo programar si no se ha programado antes para este vuelo
+          if (!processedWarehouseEventsRef.current.has(flightPickupKey)) {
+            processedWarehouseEventsRef.current.add(flightPickupKey);
+            pendingPickupsRef.current.push({
+              airportCode: destinoCode,
+              cantidad: cantidadProductos, // Toda la cantidad del vuelo
+              pickupTime,
+              flightEventId: eventId, // Usar eventId para hacer la recogida única
+            });
+            console.log(`[PICKUP] Programado vuelo ${eventId} (${cantidadProductos} productos) para recoger en ${destinoCode} a las ${pickupTime.toISOString()}`);
           }
-        });
-        
-        if (pedidosConDestinoFinal > 0) {
-          console.log(`[WAREHOUSE] Total cola pickups: ${pendingPickupsRef.current.length}`);
         }
       }
     });
@@ -607,14 +587,14 @@ export function useTemporalSimulation({
     }
     
     pendingPickupsRef.current.forEach(pickup => {
-      // Key única por pedido para evitar procesar el mismo pedido dos veces
-      const pickupKey = `processed-pickup-${pickup.idPedido}`;
+      // Key única por vuelo para evitar procesar el mismo vuelo dos veces
+      const pickupKey = `processed-pickup-flight-${pickup.flightEventId}`;
       const yaLlegoHora = pickup.pickupTime <= currentDateTime;
       const yaProcesado = processedWarehouseEventsRef.current.has(pickupKey);
       
       if (yaLlegoHora && !yaProcesado) {
         processedWarehouseEventsRef.current.add(pickupKey);
-        console.log(`[PICKUP] ✅ Pedido ${pickup.idPedido} recogido en ${pickup.airportCode}`);
+        console.log(`[PICKUP] ✅ Vuelo ${pickup.flightEventId} (${pickup.cantidad} productos) recogido en ${pickup.airportCode}`);
         
         const airportState = newStorage.get(pickup.airportCode);
         if (airportState) {
@@ -652,7 +632,7 @@ export function useTemporalSimulation({
     if (storageChanged) {
       setWarehouseStorage(newStorage);
     }
-  }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage, orderFinalDestinations]);
+  }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage]);
   
   // Control de reproducción con interval
   useEffect(() => {
