@@ -4,7 +4,7 @@
  * Versión mejorada de MapView que usa useTemporalSimulation
  */
 
-import { useState, useMemo/*, useEffect*/ } from 'react';
+import {useState, useMemo, useEffect} from 'react';
 import L from 'leaflet';
 import { useTemporalSimulation, useAirportCapacityManager, type TimeUnit } from '../hooks';
 import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
@@ -18,9 +18,10 @@ import { OccupancyLegend } from './OccupancyLegend';
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
   // Opcional: unidad de tiempo inicial (por defecto mantiene 'hours' para páginas semanales)
-  //initialTimeUnit?: TimeUnit;
+  initialTimeUnit?: TimeUnit;
   // Opcional: iniciar reproducción automáticamente
-  //autoPlay?: boolean;
+  autoPlay?: boolean;
+  onCompletedOrdersChange?: (ids: number[]) => void;
 }
 
 // Constantes
@@ -31,8 +32,8 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
   return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
 }
 
-export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/ }: MapViewTemporalProps) {
-  const [timeUnit, setTimeUnit] = useState<TimeUnit>(/*initialTimeUnit ??*/ 'hours');
+export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange}: MapViewTemporalProps) {
+  const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
 
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
@@ -55,16 +56,20 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
     onFlightCapacityChange: capacityManager.handleFlightCapacityEvent,
     aeropuertos: aeropuertosParaSimulacion,
   });
-
+  const { completedOrdersCount, totalOrdersCount, completedOrderIds } = simulation;
   // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
   // Iniciamos la reproducción cuando haya timeline y autoPlay esté activado
-  //useEffect(() => {
-  //  if (autoPlay && resultado.lineaDeTiempo) {
-  //    simulation.play();
-  //  }
-  //  // eslint-disable-next-line react-hooks/exhaustive-deps
-  //}, [autoPlay, resultado.lineaDeTiempo]);
-
+  useEffect(() => {
+    if (autoPlay && resultado.lineaDeTiempo) {
+      simulation.play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, resultado.lineaDeTiempo]);
+  useEffect(() => {
+    if (onCompletedOrdersChange) {
+      onCompletedOrdersChange(completedOrderIds);
+    }
+  }, [completedOrderIds, onCompletedOrdersChange]);
   // Envolver reset para también resetear capacidades
   const handleReset = () => {
     simulation.reset();
@@ -109,6 +114,7 @@ export function MapViewTemporal({ resultado/*, /*initialTimeUnit*//*, autoPlay*/
         destinationAirportId: flight.destinationAirportId,
         capacityMax: flight.capacityMax || 100,
         capacityUsed: flight.cantidadProductos || flight.orderIds.length,
+        windowIndex: flight.windowIndex,
       };
     }).filter((f): f is NonNullable<typeof f> => f !== null);
     

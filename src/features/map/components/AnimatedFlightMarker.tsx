@@ -149,7 +149,10 @@ export function AnimatedFlightMarker({
 
     // Usar el código de vuelo sin modificar (ya viene limpio del backend)
     const cleanFlightCode = flight.flightCode;
-
+    // 🔹 texto extra solo si tenemos windowIndex
+    const ventanaInfo = flight.windowIndex
+        ? `<div>Ventana: ${flight.windowIndex}</div>`
+        : '';
     marker.bindPopup(`
       <div style="min-width: 220px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
@@ -160,6 +163,7 @@ export function AnimatedFlightMarker({
           <div>Progreso: ${progressPercent}%</div>
           <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
           <div>Num. Pedidos: ${numPedidos}</div>
+          ${ventanaInfo}
         </div>
       </div>
     `, { offset: [0, -10] });
@@ -191,7 +195,10 @@ export function AnimatedFlightMarker({
     const progressPercent = Math.round(flight.currentProgress * 100);
     const numPedidos = flight.orderIds?.length || 1;
     const cleanFlightCode = flight.flightCode;
-    
+    // 🔹 texto extra solo si tenemos windowIndex
+    const ventanaInfo = flight.windowIndex
+        ? `<div>Ventana: ${flight.windowIndex}</div>`
+        : '';
     markerRef.current.setPopupContent(`
       <div style="min-width: 220px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
@@ -202,6 +209,7 @@ export function AnimatedFlightMarker({
           <div>Progreso: ${progressPercent}%</div>
           <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
           <div>Num. Pedidos: ${numPedidos}</div>
+          ${ventanaInfo}
         </div>
       </div>
     `);
