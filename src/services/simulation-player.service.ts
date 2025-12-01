@@ -39,6 +39,7 @@ export interface ActiveFlightState {
   capacityUsed?: number;
   capacityMax?: number;
   cost?: number;
+  windowIndex?: number;
 }
 
 export class SimulationPlayer {

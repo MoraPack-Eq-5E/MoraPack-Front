@@ -29,6 +29,7 @@ export interface ActiveFlight {
   progress: number; // 0-1
   capacityMax?: number; // Capacidad máxima del vuelo
   cantidadProductos?: number; // Cantidad de productos en este vuelo
+  windowIndex?: number;
 }
 
 export interface FlightCapacityEvent {
@@ -120,7 +121,7 @@ export function useTemporalSimulation({
 
   // Refs para callbacks
   const onFlightCapacityChangeRef = useRef(onFlightCapacityChange);
-
+  const [completedOrderIdsList, setCompletedOrderIdsList] = useState<number[]>([]);
   // Actualizar ref cuando callback cambia
   useEffect(() => {
     onFlightCapacityChangeRef.current = onFlightCapacityChange;
@@ -152,7 +153,36 @@ export function useTemporalSimulation({
 
   // Duración total en segundos
   const totalDurationSeconds = useMemo(() => {
-    return (timeline?.duracionTotalMinutos || 0) * 60;
+    //return (timeline?.duracionTotalMinutos || 0) * 60;
+    if (!timeline) return 0;
+
+    // 1) Si viene duracionTotalMinutos > 0 desde el back, úsalo
+    if (timeline.duracionTotalMinutos && timeline.duracionTotalMinutos > 0) {
+      return timeline.duracionTotalMinutos * 60;
+    }
+
+    // 2) Si tenemos horaInicioSimulacion y horaFinSimulacion, úsalas
+    if (timeline.horaInicioSimulacion && timeline.horaFinSimulacion) {
+      const start = new Date(timeline.horaInicioSimulacion);
+      const end = new Date(timeline.horaFinSimulacion);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs > 0) {
+        return diffMs / 1000;
+      }
+    }
+
+    // 3) Fallback: calcular desde las horas de los eventos
+    if (timeline.eventos && timeline.eventos.length > 0) {
+      const times = timeline.eventos.map(e => new Date(e.horaEvento).getTime());
+      const min = Math.min(...times);
+      const max = Math.max(...times);
+      if (max > min) {
+        return (max - min) / 1000;
+      }
+    }
+
+    // 4) Último recurso: 1h por defecto
+    return 3600;
   }, [timeline]);
 
   // Hora actual de simulación
@@ -334,7 +364,7 @@ export function useTemporalSimulation({
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
       const hasDeparted = departureTime <= currentDateTime;
-
+      const windowIndex = (departureEvent as any).ventanaIndex;
       // Calcular arrival time efectivo (real o estimado)
       let effectiveArrivalTime = arrivalTime;
       if (!effectiveArrivalTime && hasDeparted) {
@@ -477,6 +507,7 @@ export function useTemporalSimulation({
             progress,
             capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
             cantidadProductos: departureEvent.cantidadProductos || 1, // Cantidad de productos
+            windowIndex,
           });
         }
       } else {
@@ -503,6 +534,7 @@ export function useTemporalSimulation({
       inFlight: activeFlightsList.length,
       pending: pendingCount,
     });
+    setCompletedOrderIdsList(Array.from(completedOrderIds));
   }, [currentSimTime, flightPairs, simulationStartTime, orderFinalDestinations]);
 
   // Actualizar almacenamiento de aeropuertos según eventos
@@ -745,7 +777,7 @@ export function useTemporalSimulation({
     flightStats,
     progressPercent,
     warehouseStorage,  // Estado de almacenes por aeropuerto
-
+    completedOrderIds: completedOrderIdsList,
     // Controles
     play,
     pause,
