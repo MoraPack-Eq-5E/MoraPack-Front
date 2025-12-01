@@ -7,7 +7,7 @@
  * 2. Ejecutar ventanas manual o automáticamente
  * 3. Mostrar resultados por ventana
  */
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, FormEvent } from 'react';
 import { MapViewTemporal } from '@/features/map/components';
 import {
   ejecutarAlgoritmoDiario,
@@ -22,6 +22,12 @@ type VentanaSimulacion = {
   horaFin: string;
   resultado: AlgoritmoResponse;
   orderIds: number[];
+};
+type PedidoLocal = {
+  id: number;
+  destino: string;
+  cantidad: number;
+  fechaRegistro: string;
 };
 
 export function EnVivoPage() {
@@ -45,6 +51,13 @@ export function EnVivoPage() {
 
   const { isLoading: airportsLoading, refetch: refetchAirports } =
       useAirportsForMap();
+  // === Estado para pedidos locales (solo front) ===
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [nuevoPedidoDestino, setNuevoPedidoDestino] = useState('');
+  const [nuevoPedidoCantidad, setNuevoPedidoCantidad] = useState(1);
+  const [orderFormError, setOrderFormError] = useState<string | null>(null);
+  const [pedidosLocales, setPedidosLocales] = useState<PedidoLocal[]>([]);
+  const pedidoIdRef = useRef(1);
 
   function toLocalIsoNoZ(date: Date) {
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -252,13 +265,42 @@ export function EnVivoPage() {
 
     return () => clearInterval(interval);
   }, [autoRun, intervaloMs, isRunning]);
+  // --------- handler para crear pedido local (solo front) ----------
+  const handleSubmitPedido = (e: FormEvent) => {
+    e.preventDefault();
 
+    const destino = nuevoPedidoDestino.trim().toUpperCase();
+    const cantidad = Number(nuevoPedidoCantidad);
+
+    if (!destino) {
+      setOrderFormError('El código de destino es obligatorio.');
+      return;
+    }
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      setOrderFormError('La cantidad debe ser mayor a 0.');
+      return;
+    }
+
+    const now = new Date();
+    const nuevo: PedidoLocal = {
+      id: pedidoIdRef.current++,
+      destino,
+      cantidad,
+      fechaRegistro: toLocalIsoNoZ(now),
+    };
+
+    setPedidosLocales((prev) => [...prev, nuevo]);
+    setOrderFormError(null);
+    setNuevoPedidoDestino('');
+    setNuevoPedidoCantidad(1);
+    setShowOrderForm(false);
+
+    // Por ahora solo log: aquí luego puedes llamar a tu API / registrar en back
+    console.log('[EnVivo] Pedido local registrado (solo front):', nuevo);
+  };
   // -------------- RENDER --------------
   return (
       <div className="h-full flex flex-col p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          🔴 Simulación En Vivo (Día a día)
-        </h1>
 
         {!dataCargada && (
             <div className="mb-6">
@@ -314,11 +356,25 @@ export function EnVivoPage() {
                       />
                   )}
                 </div>
+                {/* lado derecho: botón Registrar pedido */}
+                <button
+                    type="button"
+                    onClick={() => setShowOrderForm((v) => !v)}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium shadow-sm"
+                >
+                  Registrar pedido
+                </button>
 
                 <p className="mt-1 text-sm text-gray-500">
                   Hora inicio próxima ventana:{' '}
                   <strong>{horaActual}</strong>
                 </p>
+                {pedidosLocales.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Pedidos registrados localmente (solo front):{' '}
+                      <strong>{pedidosLocales.length}</strong>
+                    </p>
+                )}
               </div>
 
               <div className="flex-1 flex gap-4 min-h-0">
@@ -339,7 +395,74 @@ export function EnVivoPage() {
                       </div>
                   )}
                 </div>
+                {/* Panel flotante para registrar pedido */}
+                {showOrderForm && (
+                    <div className="absolute top-3 right-3 z-[1100] bg-white/95 backdrop-blur-sm rounded-xl shadow-xl p-4 w-[260px]">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-semibold text-gray-800">
+                          Registrar pedido
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={() => setShowOrderForm(false)}
+                            className="text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
 
+                      <form
+                          className="space-y-3 text-xs"
+                          onSubmit={handleSubmitPedido}
+                      >
+                        <div>
+                          <label className="block text-gray-600 mb-1">
+                            Código destino (IATA)
+                          </label>
+                          <input
+                              type="text"
+                              value={nuevoPedidoDestino}
+                              onChange={(e) =>
+                                  setNuevoPedidoDestino(e.target.value)
+                              }
+                              className="w-full border rounded px-2 py-1.5 text-sm"
+                              placeholder="Ej: SKBO, SBBR..."
+                              maxLength={10}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-gray-600 mb-1">
+                            Cantidad de productos
+                          </label>
+                          <input
+                              type="number"
+                              min={1}
+                              value={nuevoPedidoCantidad}
+                              onChange={(e) =>
+                                  setNuevoPedidoCantidad(
+                                      Number(e.target.value) || 1
+                                  )
+                              }
+                              className="w-full border rounded px-2 py-1.5 text-sm"
+                          />
+                        </div>
+
+                        {orderFormError && (
+                            <p className="text-[11px] text-red-600">
+                              {orderFormError}
+                            </p>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="w-full mt-1 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-xs font-semibold"
+                        >
+                          Guardar pedido (solo front)
+                        </button>
+                      </form>
+                    </div>
+                )}
                 {/* Panel derecho con info por ventana */}
                 <div className="w-80 border rounded-xl p-3 bg-white overflow-y-auto">
                   <h3 className="font-semibold mb-2">
