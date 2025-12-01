@@ -733,7 +733,7 @@ export function EnVivoPage() {
           {/* Mapa */}
  /*         <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
             {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
-              <MapViewTemporal resultado={resultadoVentana} /*initialTimeUnit="seconds" autoPlay*/ />
+              <MapViewTemporal resultado={resultadoVentana} /*initialTimeUnit="seconds" autoPlay*/ /*/>
             ) : (
               <div className="h-full flex items-center justify-center text-gray-500">
                 {airportsLoading
