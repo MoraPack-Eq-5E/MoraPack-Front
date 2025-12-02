@@ -458,8 +458,9 @@ export function useTemporalSimulation({
           });
           
           // Generar evento de simulación: Pedido(s) despegaron
+          // IMPORTANTE: Hacer copia del array para evitar problemas de referencia
           const orderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
-            ? departureEvent.idsPedidos
+            ? [...departureEvent.idsPedidos]  // Copia del array
             : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
           
           if (orderIds.length > 0) {
@@ -478,7 +479,7 @@ export function useTemporalSimulation({
               {
                 flightId,
                 flightCode,
-                orderIds,
+                orderIds,  // Ahora es una copia, no se modificará
                 airportCode: origenCode,
                 productCount: totalVolume,
               }
@@ -528,8 +529,9 @@ export function useTemporalSimulation({
           });
           
           // Generar evento de simulación: Pedido(s) llegaron
+          // IMPORTANTE: Hacer copia del array para evitar problemas de referencia
           const orderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
-            ? departureEvent.idsPedidos
+            ? [...departureEvent.idsPedidos]  // Copia del array
             : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
           
           if (orderIds.length > 0 && effectiveArrivalTime) {
@@ -550,7 +552,7 @@ export function useTemporalSimulation({
                 {
                   flightId,
                   flightCode,
-                  orderIds,
+                  orderIds,  // Ahora es una copia
                   airportCode: destinoCode,
                   productCount: totalVolume,
                 }
@@ -564,7 +566,7 @@ export function useTemporalSimulation({
                 {
                   flightId,
                   flightCode,
-                  orderIds,
+                  orderIds,  // Ahora es una copia
                   airportCode: destinoCode,
                   productCount: totalVolume,
                 }
