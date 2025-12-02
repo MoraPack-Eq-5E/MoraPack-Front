@@ -35,18 +35,28 @@ const DEFAULT_MAX_EVENTS = 50;
 function categorizeEvent(event: SimulationEvent): EventCategory {
   const { type } = event;
   
+  // Eventos de vuelo
   if (type === 'FLIGHT_DEPARTURE' || type === 'FLIGHT_ARRIVAL') {
     return 'FLIGHT';
   }
   
+  // Eventos de almacén
   if (type === 'WAREHOUSE_WARNING' || type === 'WAREHOUSE_CRITICAL' || type === 'WAREHOUSE_FULL') {
     return 'WAREHOUSE';
   }
   
-  if (type === 'ORDER_DELIVERED') {
+  // Eventos de pedido
+  if (
+    type === 'ORDER_DELIVERED' || 
+    type === 'ORDER_DEPARTED' || 
+    type === 'ORDER_ARRIVED_AIRPORT' || 
+    type === 'ORDER_AT_DESTINATION' || 
+    type === 'ORDER_PICKED_UP'
+  ) {
     return 'ORDER';
   }
   
+  // Alertas
   if (type === 'SLA_RISK') {
     return 'ALERT';
   }

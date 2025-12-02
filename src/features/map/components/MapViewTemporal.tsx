@@ -12,8 +12,8 @@ import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
 import { AnimatedFlightMarker } from './AnimatedFlightMarker';
 import { RoutesLayer } from './RoutesLayer';
-import { SimulationControlsFloating } from './SimulationControlsFloating';
 import { OccupancyLegend } from './OccupancyLegend';
+import { EventFeed } from './EventFeed';
 
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
@@ -34,6 +34,8 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
 
 export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange}: MapViewTemporalProps) {
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
+  const [showControls, setShowControls] = useState(true);
+  const [showEventFeed, setShowEventFeed] = useState(true);
 
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
@@ -56,7 +58,7 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
     onFlightCapacityChange: capacityManager.handleFlightCapacityEvent,
     aeropuertos: aeropuertosParaSimulacion,
   });
-  const { completedOrdersCount, totalOrdersCount, completedOrderIds } = simulation;
+  const { completedOrdersCount, totalOrdersCount, completedOrderIds, simulationEvents } = simulation;
   // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
   // Iniciamos la reproducción cuando haya timeline y autoPlay esté activado
   useEffect(() => {
@@ -205,22 +207,187 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
         })}
       </MapCanvas>
 
-      {/* Controles flotantes (top-right) */}
+      {/* Panel lateral unificado (controles + eventos) */}
       {resultado.lineaDeTiempo && (
-        <SimulationControlsFloating
-          isPlaying={simulation.isPlaying}
-          onPlay={simulation.play}
-          onPause={simulation.pause}
-          onReset={handleReset}
-          progressPercent={simulation.progressPercent}
-          currentSimTime={simulation.currentSimTime}
-          formatSimulationTime={simulation.formatSimulationTime}
-          flightStats={simulation.flightStats}
-          completedOrdersCount={simulation.completedOrdersCount}
-          totalOrdersCount={simulation.totalOrdersCount}
-          timeUnit={timeUnit}
-          onTimeUnitChange={setTimeUnit}
-        />
+        <div className="absolute top-3 right-3 bottom-3 z-[1000] w-80 flex flex-col gap-2 pointer-events-none">
+          {/* Sección de Controles */}
+          <div className={`bg-white/95 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden flex-shrink-0 pointer-events-auto transition-all duration-300 ${!showControls ? 'flex-grow-0' : ''}`}>
+            {/* Header de controles - clickeable para colapsar */}
+            <div 
+              className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5 cursor-pointer select-none"
+              onClick={() => setShowControls(!showControls)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-white">Reproductor</h3>
+                  {/* Mini indicador de estado cuando está colapsado */}
+                  {!showControls && (
+                    <span className="text-[10px] text-white/80 font-mono">
+                      {simulation.formatSimulationTime(simulation.currentSimTime)}
+                    </span>
+                  )}
+                </div>
+                <button
+                  className="text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
+                  title={showControls ? 'Colapsar' : 'Expandir'}
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform duration-200 ${showControls ? '' : 'rotate-180'}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Contenido de controles - colapsable */}
+            <div className={`overflow-hidden transition-all duration-300 ${showControls ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="p-3">
+                {/* Botones Play/Pause/Reset */}
+                <div className="flex gap-2 mb-3">
+                  {!simulation.isPlaying ? (
+                    <button
+                      onClick={simulation.play}
+                      className="flex-1 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                      Reproducir
+                    </button>
+                  ) : (
+                    <button
+                      onClick={simulation.pause}
+                      className="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Pausar
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={handleReset}
+                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm"
+                    title="Reiniciar"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {/* Barra de progreso */}
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                  <div 
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-100"
+                    style={{ width: `${Math.min(100, Math.max(0, simulation.progressPercent))}%` }}
+                  />
+                </div>
+                
+                {/* Selector de velocidad */}
+                <div className="mb-3">
+                  <div className="text-xs text-gray-500 mb-1.5 font-medium">
+                    Velocidad: 1 segundo real =
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { unit: 'seconds' as TimeUnit, label: '1 seg' },
+                      { unit: 'minutes' as TimeUnit, label: '1 min' },
+                      { unit: 'hours' as TimeUnit, label: '1 hora' },
+                      { unit: 'days' as TimeUnit, label: '1 día' },
+                    ].map(({ unit, label }) => (
+                      <button
+                        key={unit}
+                        onClick={() => setTimeUnit(unit)}
+                        className={`px-2 py-1.5 text-xs font-bold rounded transition-all ${
+                          timeUnit === unit
+                            ? 'bg-teal-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Estadísticas */}
+                <div className="text-xs space-y-1.5 pt-3 border-t border-gray-200">
+                  <div className="flex justify-between text-gray-600">
+                    <span className="font-medium">Tiempo:</span>
+                    <span className="font-mono font-bold text-teal-700">
+                      {simulation.formatSimulationTime(simulation.currentSimTime)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span className="font-medium">Vuelos activos:</span>
+                    <span className="font-semibold text-sky-600">
+                      {simulation.flightStats.inFlight}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span className="font-medium">Pedidos entregados:</span>
+                    <span className="font-semibold text-emerald-600">
+                      {completedOrdersCount}/{totalOrdersCount}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sección de Eventos */}
+          <div className={`bg-white/95 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden pointer-events-auto transition-all duration-300 ${showEventFeed ? 'flex-1 min-h-0 flex flex-col' : 'flex-shrink-0'}`}>
+            {/* Header de eventos - clickeable para colapsar */}
+            <div 
+              className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5 cursor-pointer flex-shrink-0 select-none"
+              onClick={() => setShowEventFeed(!showEventFeed)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full bg-white ${simulationEvents.length > 0 ? 'animate-pulse' : ''}`}></div>
+                  <h3 className="text-sm font-semibold text-white">Eventos en Tiempo Real</h3>
+                  <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {simulationEvents.length}
+                  </span>
+                </div>
+                <button
+                  className="text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
+                  title={showEventFeed ? 'Colapsar' : 'Expandir'}
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform duration-200 ${showEventFeed ? '' : 'rotate-180'}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Contenido de eventos - colapsable */}
+            {showEventFeed && (
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <EventFeed 
+                  events={simulationEvents}
+                  enableSearch={true}
+                  embedded={true}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Leyenda de ocupación (bottom-left) */}

@@ -68,17 +68,56 @@ export interface SimulationMetrics {
   averageWarehouseOccupancy: number;
 }
 
+/**
+ * Tipos de eventos de simulación
+ * 
+ * Eventos de vuelos:
+ * - FLIGHT_DEPARTURE: Vuelo despega de aeropuerto
+ * - FLIGHT_ARRIVAL: Vuelo aterriza en aeropuerto
+ * 
+ * Eventos de pedidos:
+ * - ORDER_DEPARTED: Pedido despegó en un vuelo
+ * - ORDER_ARRIVED_AIRPORT: Pedido llegó a aeropuerto (escala o destino)
+ * - ORDER_AT_DESTINATION: Pedido llegó a destino final
+ * - ORDER_PICKED_UP: Cliente recogió el pedido
+ * - ORDER_DELIVERED: Pedido entregado (legacy/compatibilidad)
+ * 
+ * Eventos de almacén:
+ * - WAREHOUSE_WARNING: Almacén cerca de capacidad máxima
+ * - WAREHOUSE_CRITICAL: Almacén en estado crítico
+ * - WAREHOUSE_FULL: Almacén lleno
+ * 
+ * Otros:
+ * - SLA_RISK: Riesgo de incumplimiento de SLA
+ * - INFO: Información general
+ */
+export type SimulationEventType = 
+  | 'FLIGHT_DEPARTURE' 
+  | 'FLIGHT_ARRIVAL' 
+  | 'ORDER_DEPARTED'
+  | 'ORDER_ARRIVED_AIRPORT'
+  | 'ORDER_AT_DESTINATION'
+  | 'ORDER_PICKED_UP'
+  | 'ORDER_DELIVERED' 
+  | 'WAREHOUSE_WARNING' 
+  | 'WAREHOUSE_CRITICAL' 
+  | 'WAREHOUSE_FULL' 
+  | 'SLA_RISK' 
+  | 'INFO';
+
 export interface SimulationEvent {
   id: string;
-  type: 'FLIGHT_DEPARTURE' | 'FLIGHT_ARRIVAL' | 'ORDER_DELIVERED' | 
-        'WAREHOUSE_WARNING' | 'WAREHOUSE_CRITICAL' | 'WAREHOUSE_FULL' | 
-        'SLA_RISK' | 'INFO';
+  type: SimulationEventType;
   message: string;
   simulatedTime: string;
   realTime: string;
   relatedFlightId?: number;
+  relatedFlightCode?: string;
   relatedOrderId?: number;
+  relatedOrderIds?: number[];
   relatedAirportCode?: string;
+  relatedAirportName?: string;
+  productCount?: number;
 }
 
 export interface StartVisualizationRequest {

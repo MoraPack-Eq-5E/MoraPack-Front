@@ -23,6 +23,8 @@ interface EventFeedProps {
   maxHeight?: string;
   enableSearch?: boolean;
   onEventClick?: (event: SimulationEvent) => void;
+  /** Si true, no muestra el header (para usar embebido en otro contenedor) */
+  embedded?: boolean;
 }
 
 /**
@@ -33,21 +35,59 @@ function getEventStyle(type: SimulationEvent['type']): {
   bgColor: string;
   textColor: string;
   borderColor: string;
+  label: string;
 } {
   switch (type) {
+    // Eventos de vuelo
     case 'FLIGHT_DEPARTURE':
       return {
         icon: '🛫',
-        bgColor: 'bg-blue-50',
-        textColor: 'text-blue-700',
-        borderColor: 'border-l-blue-500',
+        bgColor: 'bg-sky-50',
+        textColor: 'text-sky-700',
+        borderColor: 'border-l-sky-500',
+        label: 'Despegue',
       };
     case 'FLIGHT_ARRIVAL':
       return {
         icon: '🛬',
+        bgColor: 'bg-teal-50',
+        textColor: 'text-teal-700',
+        borderColor: 'border-l-teal-500',
+        label: 'Aterrizaje',
+      };
+    
+    // Eventos de pedidos
+    case 'ORDER_DEPARTED':
+      return {
+        icon: '📤',
+        bgColor: 'bg-indigo-50',
+        textColor: 'text-indigo-700',
+        borderColor: 'border-l-indigo-500',
+        label: 'Pedido en vuelo',
+      };
+    case 'ORDER_ARRIVED_AIRPORT':
+      return {
+        icon: '📍',
+        bgColor: 'bg-cyan-50',
+        textColor: 'text-cyan-700',
+        borderColor: 'border-l-cyan-500',
+        label: 'Llegada escala',
+      };
+    case 'ORDER_AT_DESTINATION':
+      return {
+        icon: '🎯',
+        bgColor: 'bg-emerald-50',
+        textColor: 'text-emerald-700',
+        borderColor: 'border-l-emerald-500',
+        label: 'En destino',
+      };
+    case 'ORDER_PICKED_UP':
+      return {
+        icon: '✅',
         bgColor: 'bg-green-50',
         textColor: 'text-green-700',
         borderColor: 'border-l-green-500',
+        label: 'Recogido',
       };
     case 'ORDER_DELIVERED':
       return {
@@ -55,13 +95,17 @@ function getEventStyle(type: SimulationEvent['type']): {
         bgColor: 'bg-purple-50',
         textColor: 'text-purple-700',
         borderColor: 'border-l-purple-500',
+        label: 'Entregado',
       };
+    
+    // Eventos de almacén
     case 'WAREHOUSE_WARNING':
       return {
         icon: '⚠️',
         bgColor: 'bg-yellow-50',
         textColor: 'text-yellow-700',
         borderColor: 'border-l-yellow-500',
+        label: 'Alerta almacén',
       };
     case 'WAREHOUSE_CRITICAL':
     case 'WAREHOUSE_FULL':
@@ -70,6 +114,7 @@ function getEventStyle(type: SimulationEvent['type']): {
         bgColor: 'bg-red-50',
         textColor: 'text-red-700',
         borderColor: 'border-l-red-500',
+        label: 'Almacén lleno',
       };
     case 'SLA_RISK':
       return {
@@ -77,6 +122,7 @@ function getEventStyle(type: SimulationEvent['type']): {
         bgColor: 'bg-orange-50',
         textColor: 'text-orange-700',
         borderColor: 'border-l-orange-500',
+        label: 'Riesgo SLA',
       };
     default:
       return {
@@ -84,6 +130,7 @@ function getEventStyle(type: SimulationEvent['type']): {
         bgColor: 'bg-gray-50',
         textColor: 'text-gray-700',
         borderColor: 'border-l-gray-500',
+        label: 'Info',
       };
   }
 }
@@ -111,21 +158,53 @@ function EventItem({ event, onClick }: { event: SimulationEvent; onClick?: (even
       onClick={() => onClick?.(event)}
     >
       <div className="flex items-start gap-2">
-        <span className="text-lg flex-shrink-0">{style.icon}</span>
+        <span className="text-xl flex-shrink-0">{style.icon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className={`text-xs font-semibold ${style.textColor}`}>
-              {formatTimestamp(event.simulatedTime)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${style.bgColor} ${style.textColor} border border-current/20`}>
+                {style.label}
+              </span>
+              <span className={`text-xs font-medium ${style.textColor} opacity-75`}>
+                {formatTimestamp(event.simulatedTime)}
+              </span>
+            </div>
             {event.relatedAirportCode && (
-              <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-gray-200">
+              <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-gray-200 shadow-sm">
                 {event.relatedAirportCode}
               </span>
             )}
           </div>
-          <p className={`text-sm ${style.textColor} font-medium`}>
+          <p className={`text-sm ${style.textColor} font-medium leading-snug`}>
             {event.message}
           </p>
+          {/* Información adicional */}
+          <div className="flex items-center gap-3 mt-1.5 text-xs opacity-70">
+            {event.relatedFlightCode && (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Vuelo {event.relatedFlightCode}
+              </span>
+            )}
+            {event.productCount && event.productCount > 0 && (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                {event.productCount} productos
+              </span>
+            )}
+            {event.relatedOrderIds && event.relatedOrderIds.length > 0 && (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                {event.relatedOrderIds.length} pedido{event.relatedOrderIds.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -140,6 +219,7 @@ export function EventFeed({
   maxHeight = '400px',
   enableSearch = false,
   onEventClick,
+  embedded = false,
 }: EventFeedProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,10 +247,78 @@ export function EventFeed({
 
   const toggleExpand = () => setIsExpanded(!isExpanded);
 
+  // Modo embebido: solo contenido sin wrapper
+  if (embedded) {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Búsqueda */}
+        {enableSearch && (
+          <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="Buscar eventos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-1.5 text-sm bg-gray-50 text-gray-700 placeholder-gray-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+            />
+          </div>
+        )}
+        
+        {/* Lista de eventos */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto custom-scrollbar"
+        >
+          <div className="p-3">
+            {filteredEvents.length === 0 ? (
+              <div className="text-center py-6 text-gray-400">
+                <svg
+                  className="w-10 h-10 mx-auto mb-2 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-xs font-medium">No hay eventos aún</p>
+                <p className="text-[10px] mt-0.5">Reproduce la simulación para ver eventos</p>
+              </div>
+            ) : (
+              filteredEvents.map((event) => (
+                <EventItem key={event.id} event={event} onClick={onEventClick} />
+              ))
+            )}
+          </div>
+        </div>
+        
+        {/* Footer */}
+        {events.length > 0 && (
+          <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500 flex-shrink-0">
+            <span>Mostrando {filteredEvents.length} de {events.length}</span>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="text-teal-600 hover:text-teal-800 font-medium"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Modo normal: con header completo
   return (
     <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-3">
+      <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
@@ -251,7 +399,7 @@ export function EventFeed({
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="text-blue-600 hover:text-blue-800 font-medium"
+              className="text-teal-600 hover:text-teal-800 font-medium"
             >
               Limpiar búsqueda
             </button>
