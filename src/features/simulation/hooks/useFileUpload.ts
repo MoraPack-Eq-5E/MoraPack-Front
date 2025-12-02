@@ -116,6 +116,7 @@ export function useFileUpload() {
   
   /**
    * Valida e importa los archivos subidos secuencialmente a la BD
+   * @param modoSimulacion Modo de simulación a usar (p.ej. 'diario' o 'semanal')
    * @param horaInicio Opcional: filtrar pedidos desde esta hora (ISO 8601)
    * @param horaFin Opcional: filtrar pedidos hasta esta hora (ISO 8601)
    */
@@ -134,16 +135,15 @@ export function useFileUpload() {
         throw new Error(`Error limpiando BD: ${clear.message}`);
       }
       const results: string[] = [];
-      let totalCount = 0;
-      
+
       // 1. Importar aeropuertos (primero, requerido para vuelos y pedidos)
       if (filesState.aeropuertos?.file) {
         const airportsResult = await importAirports(filesState.aeropuertos.file);
         if (!airportsResult.success) {
           throw new Error(`Error al importar aeropuertos: ${airportsResult.message}`);
         }
-        results.push(`✓ ${airportsResult.count} aeropuertos importados`);
-        totalCount += airportsResult.count || 0;
+        const airportsMsg = `✓ ${airportsResult.count} aeropuertos importados${airportsResult.count === 0 ? ' (Son los mismos que los de la base de datos)' : ''}`;
+        results.push(airportsMsg);
       }
       
       // 2. Importar vuelos (requiere aeropuertos)
@@ -152,8 +152,8 @@ export function useFileUpload() {
         if (!flightsResult.success) {
           throw new Error(`Error al importar vuelos: ${flightsResult.message}`);
         }
-        results.push(`✓ ${flightsResult.count} vuelos importados`);
-        totalCount += flightsResult.count || 0;
+        const flightsMsg = `✓ ${flightsResult.count} vuelos importados${flightsResult.count === 0 ? ' (Son los mismos que los de la base de datos)' : ''}`;
+        results.push(flightsMsg);
       }
       
       // 3. Importar pedidos (requiere aeropuertos) con filtrado opcional por tiempo
@@ -203,7 +203,6 @@ export function useFileUpload() {
           throw new Error(`Error al importar cancelaciones: ${cancResult.message}`);
         }
         results.push(`✓ ${cancResult.count} cancelaciones importadas`);
-        totalCount += cancResult.count || 0;
       }
 
       const response: FileUploadValidationResponse = {
@@ -270,4 +269,3 @@ export function useFileUpload() {
     clearAll,
   };
 }
-
