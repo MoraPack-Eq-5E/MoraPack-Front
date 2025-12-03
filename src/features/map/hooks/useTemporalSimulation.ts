@@ -460,9 +460,9 @@ export function useTemporalSimulation({
           // Generar evento de simulación: Pedido(s) despegaron
           // IMPORTANTE: Hacer copia del array para evitar problemas de referencia
           const orderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
-            ? [...departureEvent.idsPedidos]  // Copia del array
-            : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
-          
+              ? [...departureEvent.idsPedidos]  // Copia del array
+              : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
+
           if (orderIds.length > 0) {
             const origenCode = departureEvent.codigoIATAOrigen || departureEvent.ciudadOrigen || 'N/A';
             const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
@@ -531,9 +531,8 @@ export function useTemporalSimulation({
           // Generar evento de simulación: Pedido(s) llegaron
           // IMPORTANTE: Hacer copia del array para evitar problemas de referencia
           const orderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
-            ? [...departureEvent.idsPedidos]  // Copia del array
-            : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
-          
+              ? [...departureEvent.idsPedidos]  // Copia del array
+              : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
           if (orderIds.length > 0 && effectiveArrivalTime) {
             const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
             const flightCode = departureEvent.codigoVuelo || `V${flightId}`;

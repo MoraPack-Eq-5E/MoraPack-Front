@@ -182,10 +182,11 @@ interface FileUploadSectionProps {
   horaInicio?: string;
   horaFin?: string;
   modoSimulacion: string;
+  onClear?: () => void; // callback que indica que la BD y el estado local fueron limpiados
 }
 
-export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
-   modoSimulacion }: FileUploadSectionProps) {
+export function FileUploadSection(props: FileUploadSectionProps) {
+  const { onValidationSuccess, horaInicio, horaFin, modoSimulacion } = props;
   const {
     filesState,
     clientErrors,
@@ -198,14 +199,55 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
     clearAll,
   } = useFileUpload();
   
+  // Wrappers que limpian el mensaje de 'limpieza' cuando el usuario realiza acciones
+  const handleAddFile = (file: File | File[], type: SimulationFileType) => {
+    setClearMessage(null);
+    addFile(file, type);
+  };
+
+  const handleRemoveFileWrapper = (type: SimulationFileType) => {
+    setClearMessage(null);
+    removeFile(type);
+  };
+
+  const handleRemoveFileByIndexWrapper = (index: number) => {
+    setClearMessage(null);
+    removeFileByIndex(index);
+  };
+
   const handleValidate = async () => {
+    // Al iniciar una nueva validación/importe, limpiar mensajes previos de "limpieza"
+    setClearMessage(null);
     const result = await validateFiles(modoSimulacion,horaInicio, horaFin,);
     if (result?.success && result.sessionId) {
       // Llamar onValidationSuccess y esperar si es async
       await onValidationSuccess(result.sessionId);
     }
   };
-  
+
+  // Nuevo estado local para controlar la acción de limpiar
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
+
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    setClearMessage(null);
+    try {
+      const res = await clearAll();
+      if (res && res.success) {
+        setClearMessage('Se limpió toda la información subida.');
+        // Notificar al componente padre para que limpie su estado (resultadoCarga, dataCargada, etc.)
+        props.onClear?.();
+      } else {
+        setClearMessage(res?.message || 'No se pudo limpiar la información.');
+      }
+    } catch (error) {
+      setClearMessage(error instanceof Error ? error.message : 'Error desconocido al limpiar.');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -229,25 +271,25 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
           title="Aeropuertos"
           description="aeropuertosinfo.txt"
           file={filesState.aeropuertos?.file}
-          onFileSelect={(file) => addFile(file, SimulationFileType.AEROPUERTOS)}
-          onFileRemove={() => removeFile(SimulationFileType.AEROPUERTOS)}
+          onFileSelect={(file) => handleAddFile(file, SimulationFileType.AEROPUERTOS)}
+          onFileRemove={() => handleRemoveFileWrapper(SimulationFileType.AEROPUERTOS)}
         />
         
         <FileInputCard
           title="Vuelos"
           description="vuelos.txt"
           file={filesState.vuelos?.file}
-          onFileSelect={(file) => addFile(file, SimulationFileType.VUELOS)}
-          onFileRemove={() => removeFile(SimulationFileType.VUELOS)}
+          onFileSelect={(file) => handleAddFile(file, SimulationFileType.VUELOS)}
+          onFileRemove={() => handleRemoveFileWrapper(SimulationFileType.VUELOS)}
         />
         
         <FileInputCard
           title="Pedidos"
           description="pedidos.txt (múltiples archivos permitidos)"
           files={filesState.pedidos?.map(p => p.file)}
-          onFileSelect={(file) => addFile(file, SimulationFileType.PEDIDOS)}
-          onFileRemove={() => removeFile(SimulationFileType.PEDIDOS)}
-          onFileRemoveByIndex={removeFileByIndex}
+          onFileSelect={(file) => handleAddFile(file, SimulationFileType.PEDIDOS)}
+          onFileRemove={() => handleRemoveFileWrapper(SimulationFileType.PEDIDOS)}
+          onFileRemoveByIndex={handleRemoveFileByIndexWrapper}
           acceptMultiple={true}
         />
       </div>
@@ -255,8 +297,8 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
           title="Cancelaciones (opcional)"
           description="cancelaciones.txt"
           file={filesState.cancelaciones?.file}
-          onFileSelect={(file) => addFile(file, SimulationFileType.CANCELACIONES)}
-          onFileRemove={() => removeFile(SimulationFileType.CANCELACIONES)}
+          onFileSelect={(file) => handleAddFile(file, SimulationFileType.CANCELACIONES)}
+          onFileRemove={() => handleRemoveFileWrapper(SimulationFileType.CANCELACIONES)}
       />
       
       {clientErrors.length > 0 && (
@@ -287,14 +329,20 @@ export function FileUploadSection({ onValidationSuccess, horaInicio, horaFin,
         
         {hasFiles && (
           <button
-            onClick={clearAll}
+            onClick={handleClearAll}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+            disabled={isClearing}
           >
-            Limpiar todo
+            {isClearing ? 'Limpiando...' : 'Limpiar todo'}
           </button>
         )}
       </div>
+
+      {clearMessage && (
+        <div className={`mt-3 p-3 rounded-lg ${clearMessage.includes('No se pudo') || clearMessage.includes('Error') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+          {clearMessage}
+        </div>
+      )}
     </div>
   );
 }
-

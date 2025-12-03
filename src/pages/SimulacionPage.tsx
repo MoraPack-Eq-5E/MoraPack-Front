@@ -528,6 +528,14 @@ export function SimulacionPage() {
                 horaFin={modoSimulacion === 'SEMANAL' ? 
                   calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!) : undefined}
                 modoSimulacion={modoSimulacion}
+               onClear={() => {
+                 // Cuando el usuario limpia todo, forzamos limpiar el estado de carga
+                 setDataCargada(false);
+                setResultadoCarga(null);
+                 setEstadoDatos(null);
+                 setError(null);
+                 console.log('[SimulacionPage] Se recibió onClear: estado de carga reseteado');
+               }}
               />
             </div>
             
