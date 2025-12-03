@@ -233,11 +233,24 @@ export function useFileUpload() {
   /**
    * Limpia todos los archivos y el estado
    */
-  const clearAll = () => {
+  const clearAll = async (): Promise<{ success: boolean; message?: string } | null> => {
+    // Limpiar estado local inmediatamente
     setFilesState({
       isValidating: false,
     });
     setClientErrors([]);
+
+    try {
+      const res = await limpiarDataPrueba();
+      // Asegurar que el estado local quede limpio
+      setFilesState({ isValidating: false });
+      // también limpiar la validación previa
+      // No devolvemos validationResponse ni sessionId
+      return res;
+    } catch (error) {
+      console.error('Error limpiando data de prueba:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Error desconocido' };
+    }
   };
   
   /**
