@@ -12,3 +12,5 @@ export {
   type TimeUnit,
 } from './simulationStore';
 
+export { useFileUploadStore } from './fileUploadStore';
+

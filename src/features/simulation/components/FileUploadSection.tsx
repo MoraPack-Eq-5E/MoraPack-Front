@@ -1,6 +1,6 @@
 import { useState, useRef, type DragEvent } from 'react';
 import { ValidationResults } from './ValidationResults';
-import { useFileUpload } from '../hooks/useFileUpload';
+import { useFileUploadStore } from '@/store';
 import { SimulationFileType } from '@/types/fileUpload.types';
 
 interface FileInputCardProps {
@@ -185,9 +185,12 @@ interface FileUploadSectionProps {
 
 export function FileUploadSection(props: FileUploadSectionProps) {
   const { onValidationSuccess, horaInicio, horaFin, modoSimulacion } = props;
+  
+  // Usar el store global para que la subida continúe en background
   const {
     filesState,
     clientErrors,
+    importProgress,
     hasFiles,
     isValidated,
     addFile,
@@ -195,7 +198,7 @@ export function FileUploadSection(props: FileUploadSectionProps) {
     removeFileByIndex,
     validateFiles,
     clearAll,
-  } = useFileUpload();
+  } = useFileUploadStore();
   
   // Wrappers que limpian el mensaje de 'limpieza' cuando el usuario realiza acciones
   const handleAddFile = (file: File | File[], type: SimulationFileType) => {
@@ -314,8 +317,28 @@ export function FileUploadSection(props: FileUploadSectionProps) {
         <ValidationResults validationResponse={filesState.validationResponse} />
       )}
       
+      {/* Indicador de progreso de importación (persiste en background) */}
+      {importProgress.isImporting && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900">{importProgress.currentStep}</p>
+              {importProgress.completedSteps.length > 0 && (
+                <p className="text-xs text-blue-700 mt-1">
+                  Completados: {importProgress.completedSteps.join(' → ')}
+                </p>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-blue-600 mt-2">
+            💡 Puedes navegar a otras páginas, la importación continuará en segundo plano.
+          </p>
+        </div>
+      )}
+      
       <div className="flex gap-3">
-        {hasFiles && !isValidated && (
+        {hasFiles() && !isValidated() && (
           <button
             onClick={handleValidate}
             disabled={filesState.isValidating}
@@ -325,7 +348,7 @@ export function FileUploadSection(props: FileUploadSectionProps) {
           </button>
         )}
         
-        {hasFiles && (
+        {hasFiles() && (
           <button
             onClick={handleClearAll}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
