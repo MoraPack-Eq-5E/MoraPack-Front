@@ -72,10 +72,10 @@ function FileInputCard({
   };
   
   return (
-    <div className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
+    <div className={`border-2 border-dashed rounded-lg p-4 transition-colors overflow-hidden ${
       isDragging
         ? 'border-blue-500 bg-blue-50'
-        : file
+        : file || (files && files.length > 0)
         ? 'border-green-500 bg-green-50'
         : 'border-gray-300 hover:border-gray-400'
     }`}
@@ -84,42 +84,40 @@ function FileInputCard({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
-          <svg className={`w-10 h-10 ${file ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`w-8 h-8 ${file || (files && files.length > 0) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
         </div>
         
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-          <p className="text-sm text-gray-600 mb-3">{description}</p>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <h3 className="font-semibold text-gray-900 mb-1 text-sm">{title}</h3>
+          <p className="text-xs text-gray-600 mb-2 truncate">{description}</p>
           
           {files && files.length > 0 ? (
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-gray-700">
+            <div className="space-y-2 overflow-hidden">
+              <div className="text-xs font-medium text-gray-700">
                 {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1">
+              <div className="max-h-32 overflow-y-auto space-y-1">
                 {files.map((f, index) => (
-                  <div key={index} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-green-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-xs font-medium text-gray-700 truncate" title={f.name}>
-                        {f.name}
-                      </span>
-                      <span className="text-xs text-gray-500 flex-shrink-0">
-                        ({(f.size / 1024 / 1024).toFixed(1)} MB)
-                      </span>
-                    </div>
+                  <div key={index} className="flex items-center gap-2 bg-white rounded px-2 py-1.5 border border-green-200">
+                    <svg className="w-3 h-3 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium text-gray-700 truncate flex-1 min-w-0" title={f.name}>
+                      {f.name}
+                    </span>
+                    <span className="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
+                      ({(f.size / 1024 / 1024).toFixed(1)} MB)
+                    </span>
                     <button
                       onClick={() => onFileRemoveByIndex?.(index)}
-                      className="ml-2 text-red-600 hover:text-red-700 p-1 flex-shrink-0"
+                      className="text-red-500 hover:text-red-700 flex-shrink-0"
                       title="Eliminar archivo"
                     >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                       </svg>
                     </button>
@@ -134,22 +132,22 @@ function FileInputCard({
               </button>
             </div>
           ) : file ? (
-            <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">{file.name}</span>
-                <span className="text-xs text-gray-500">
-                  ({(file.size / 1024).toFixed(2)} KB)
-                </span>
-              </div>
+            <div className="flex items-center gap-2 bg-white rounded px-2 py-1.5 border border-green-200 overflow-hidden">
+              <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+              </svg>
+              <span className="text-xs font-medium text-gray-700 truncate flex-1 min-w-0" title={file.name}>
+                {file.name}
+              </span>
+              <span className="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
+                ({(file.size / 1024).toFixed(1)} KB)
+              </span>
               <button
                 onClick={onFileRemove}
-                className="text-red-600 hover:text-red-700 p-1"
+                className="text-red-500 hover:text-red-700 flex-shrink-0"
                 title="Eliminar archivo"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
