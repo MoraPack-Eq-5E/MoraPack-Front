@@ -151,8 +151,9 @@ export function AnimatedFlightMarker({
     const cleanFlightCode = flight.flightCode;
     // 🔹 texto extra solo si tenemos windowIndex
     const ventanaInfo = flight.windowIndex
-        ? `<div>Ventana: ${flight.windowIndex}</div>`
-        : '';
+             ? `<div>Ventana: ${flight.windowIndex}</div>`
+             : '';
+
     marker.bindPopup(`
       <div style="min-width: 220px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">

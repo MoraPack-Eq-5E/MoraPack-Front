@@ -7,7 +7,7 @@
  * 2. Ejecutar ventanas manual o automáticamente
  * 3. Mostrar resultados por ventana
  */
-import { useState, useEffect, useRef, useMemo, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, useMemo, FormEvent } from 'react';
 import { MapViewTemporal } from '@/features/map/components';
 import {
   ejecutarAlgoritmoDiario,
@@ -15,19 +15,18 @@ import {
   type LineaDeTiempoSimulacionDTO
 } from '@/services/algoritmoSemanal.service';
 import { useAirportsForMap } from '@/features/map/hooks';
-
+import { crearPedidoDiaADia } from '@/services/pedido.service';
+type PedidoVentana = {
+  id: number;
+  nombre: string;
+};
 type VentanaSimulacion = {
   index: number;
   horaInicio: string;
   horaFin: string;
   resultado: AlgoritmoResponse;
   orderIds: number[];
-};
-type PedidoLocal = {
-  id: number;
-  destino: string;
-  cantidad: number;
-  fechaRegistro: string;
+  pedidos: PedidoVentana[];
 };
 
 export function EnVivoPage() {
@@ -51,13 +50,13 @@ export function EnVivoPage() {
 
   const { isLoading: airportsLoading, refetch: refetchAirports } =
       useAirportsForMap();
-  // === Estado para pedidos locales (solo front) ===
-  const [showOrderForm, setShowOrderForm] = useState(false);
-  const [nuevoPedidoDestino, setNuevoPedidoDestino] = useState('');
-  const [nuevoPedidoCantidad, setNuevoPedidoCantidad] = useState(1);
-  const [orderFormError, setOrderFormError] = useState<string | null>(null);
-  const [pedidosLocales, setPedidosLocales] = useState<PedidoLocal[]>([]);
-  const pedidoIdRef = useRef(1);
+  // ---- Registro manual de pedidos (operación día a día) ----
+  const [showNewOrderPanel, setShowNewOrderPanel] = useState(false);
+  const [destinoCodigo, setDestinoCodigo] = useState('');
+  const [cantidadProductos, setCantidadProductos] = useState<number | ''>('');
+  const [isSavingPedido, setIsSavingPedido] = useState(false);
+  const [pedidoError, setPedidoError] = useState<string | null>(null);
+  const [ultimoPedidoId, setUltimoPedidoId] = useState<number | null>(null);
 
   function toLocalIsoNoZ(date: Date) {
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -76,7 +75,27 @@ export function EnVivoPage() {
     d.setHours(d.getHours() + hours);
     return toLocalIsoNoZ(d);
   }
+  function extraerPedidosDesdeResultado(resultado: AlgoritmoResponse): PedidoVentana[] {
+    const mapa = new Map<number, string>();
 
+    const rutas = resultado.lineaDeTiempo?.rutasProductos ?? [];
+
+    rutas.forEach((ruta: any) => {
+      const id = ruta.idPedido as number | undefined;
+      if (id == null) return;
+
+      const nombre =
+          (ruta.nombrePedido as string | undefined) ||
+          (ruta.nombre as string | undefined) ||
+          `Pedido #${id}`;
+
+      if (!mapa.has(id)) {
+        mapa.set(id, nombre);
+      }
+    });
+
+    return Array.from(mapa.entries()).map(([id, nombre]) => ({ id, nombre }));
+  }
   // Merge de timelines
   function mergeTimelines(
       prev: LineaDeTiempoSimulacionDTO | null,
@@ -194,7 +213,7 @@ export function EnVivoPage() {
 
       // 2) Calcular pedidos de esta ventana
       const orderIds = extractOrderIdsFromTimeline(resultado.lineaDeTiempo);
-
+      const pedidosVentana = extraerPedidosDesdeResultado(resultado);
       // refrescar aeropuertos
       try {
         await refetchAirports();
@@ -214,6 +233,7 @@ export function EnVivoPage() {
           horaFin: horaFinVentana,
           resultado,
           orderIds,
+          pedidos: pedidosVentana,
         },
       ]);
 
@@ -237,7 +257,7 @@ export function EnVivoPage() {
   // iniciar operación día a día
   const iniciarOperacionDiaria = async () => {
     setDataCargada(true);
-    setAutoRun(false);
+    setAutoRun(true);
     setVentanas([]);
     setTimelineGlobal(null);
 
@@ -265,38 +285,46 @@ export function EnVivoPage() {
 
     return () => clearInterval(interval);
   }, [autoRun, intervaloMs, isRunning]);
-  // --------- handler para crear pedido local (solo front) ----------
-  const handleSubmitPedido = (e: FormEvent) => {
+  const handleSubmitNuevoPedido = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPedidoError(null);
 
-    const destino = nuevoPedidoDestino.trim().toUpperCase();
-    const cantidad = Number(nuevoPedidoCantidad);
-
-    if (!destino) {
-      setOrderFormError('El código de destino es obligatorio.');
+    if (!destinoCodigo.trim()) {
+      setPedidoError('Debes ingresar el código de aeropuerto destino.');
       return;
     }
-    if (!Number.isFinite(cantidad) || cantidad <= 0) {
-      setOrderFormError('La cantidad debe ser mayor a 0.');
+    const cantidad = Number(cantidadProductos);
+    if (!cantidad || cantidad <= 0) {
+      setPedidoError('La cantidad de productos debe ser mayor a 0.');
       return;
     }
 
-    const now = new Date();
-    const nuevo: PedidoLocal = {
-      id: pedidoIdRef.current++,
-      destino,
-      cantidad,
-      fechaRegistro: toLocalIsoNoZ(now),
-    };
+    try {
+      setIsSavingPedido(true);
 
-    setPedidosLocales((prev) => [...prev, nuevo]);
-    setOrderFormError(null);
-    setNuevoPedidoDestino('');
-    setNuevoPedidoCantidad(1);
-    setShowOrderForm(false);
+      const nuevoId = await crearPedidoDiaADia({
+        aeropuertoDestinoCodigo: destinoCodigo.trim().toUpperCase(),
+        cantidadProductos: cantidad,
+        fechaPedido: horaActual,
+      });
 
-    // Por ahora solo log: aquí luego puedes llamar a tu API / registrar en back
-    console.log('[EnVivo] Pedido local registrado (solo front):', nuevo);
+      setUltimoPedidoId(nuevoId);
+      setShowNewOrderPanel(false);
+      setDestinoCodigo('');
+      setCantidadProductos('');
+
+      // Opcional: puedes mostrar un toast, por ahora uso alert
+      // eslint-disable-next-line no-alert
+      alert(
+          `Pedido registrado correctamente (ID ${nuevoId}). ` +
+          `Se asignará en la próxima ventana que ejecutes.`
+      );
+    } catch (err: any) {
+      console.error('Error registrando pedido:', err);
+      setPedidoError(err?.message ?? 'Error inesperado al registrar el pedido.');
+    } finally {
+      setIsSavingPedido(false);
+    }
   };
   // -------------- RENDER --------------
   return (
@@ -359,22 +387,16 @@ export function EnVivoPage() {
                 {/* lado derecho: botón Registrar pedido */}
                 <button
                     type="button"
-                    onClick={() => setShowOrderForm((v) => !v)}
-                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium shadow-sm"
+                    onClick={() => setShowNewOrderPanel(true)}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm"
                 >
-                  Registrar pedido
+                  + Registrar pedido
                 </button>
 
                 <p className="mt-1 text-sm text-gray-500">
                   Hora inicio próxima ventana:{' '}
                   <strong>{horaActual}</strong>
                 </p>
-                {pedidosLocales.length > 0 && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Pedidos registrados localmente (solo front):{' '}
-                      <strong>{pedidosLocales.length}</strong>
-                    </p>
-                )}
               </div>
 
               <div className="flex-1 flex gap-4 min-h-0">
@@ -395,71 +417,77 @@ export function EnVivoPage() {
                       </div>
                   )}
                 </div>
-                {/* Panel flotante para registrar pedido */}
-                {showOrderForm && (
-                    <div className="absolute top-3 right-3 z-[1100] bg-white/95 backdrop-blur-sm rounded-xl shadow-xl p-4 w-[260px]">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-sm font-semibold text-gray-800">
-                          Registrar pedido
-                        </h3>
+                {/* Panel flotante para registrar pedidos manuales */}
+                {showNewOrderPanel && (
+                    <div className="fixed right-6 top-24 z-50 w-80 bg-white border border-gray-200 shadow-2xl rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="font-semibold text-gray-900 text-sm">
+                          Registrar pedido (día a día)
+                        </h2>
                         <button
                             type="button"
-                            onClick={() => setShowOrderForm(false)}
+                            onClick={() => setShowNewOrderPanel(false)}
                             className="text-gray-400 hover:text-gray-600"
                         >
                           ✕
                         </button>
                       </div>
 
-                      <form
-                          className="space-y-3 text-xs"
-                          onSubmit={handleSubmitPedido}
-                      >
+                      <form className="space-y-3" onSubmit={handleSubmitNuevoPedido}>
                         <div>
-                          <label className="block text-gray-600 mb-1">
-                            Código destino (IATA)
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Código aeropuerto destino
                           </label>
                           <input
                               type="text"
-                              value={nuevoPedidoDestino}
-                              onChange={(e) =>
-                                  setNuevoPedidoDestino(e.target.value)
-                              }
-                              className="w-full border rounded px-2 py-1.5 text-sm"
-                              placeholder="Ej: SKBO, SBBR..."
-                              maxLength={10}
+                              value={destinoCodigo}
+                              onChange={(e) => setDestinoCodigo(e.target.value)}
+                              placeholder="Ej: SPJC, LIM, etc."
+                              className="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-gray-600 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
                             Cantidad de productos
                           </label>
                           <input
                               type="number"
                               min={1}
-                              value={nuevoPedidoCantidad}
+                              value={cantidadProductos}
                               onChange={(e) =>
-                                  setNuevoPedidoCantidad(
-                                      Number(e.target.value) || 1
-                                  )
+                                  setCantidadProductos(e.target.value === '' ? '' : Number(e.target.value))
                               }
-                              className="w-full border rounded px-2 py-1.5 text-sm"
+                              className="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           />
                         </div>
 
-                        {orderFormError && (
-                            <p className="text-[11px] text-red-600">
-                              {orderFormError}
+                        {pedidoError && (
+                            <p className="text-xs text-red-600">{pedidoError}</p>
+                        )}
+
+                        {ultimoPedidoId && (
+                            <p className="text-[11px] text-emerald-700">
+                              Último pedido creado: <strong>ID {ultimoPedidoId}</strong>
                             </p>
                         )}
 
-                        <button
-                            type="submit"
-                            className="w-full mt-1 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-xs font-semibold"
-                        >
-                          Guardar pedido (solo front)
-                        </button>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                              type="button"
+                              onClick={() => setShowNewOrderPanel(false)}
+                              className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                              type="submit"
+                              disabled={isSavingPedido}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:bg-emerald-300"
+                          >
+                            {isSavingPedido ? 'Guardando...' : 'Registrar'}
+                          </button>
+                        </div>
                       </form>
                     </div>
                 )}
@@ -502,6 +530,18 @@ export function EnVivoPage() {
                             Productos:{' '}
                             <strong>{v.resultado.totalProductos}</strong>
                           </div>
+                          {v.pedidos.length > 0 && (
+                              <div className="mt-1">
+                                <div className="font-semibold mb-0.5">Listado de pedidos:</div>
+                                <ul className="list-disc list-inside space-y-0.5">
+                                  {v.pedidos.map((p) => (
+                                      <li key={p.id}>
+                                        {p.nombre} <span className="text-[10px] text-gray-500">(# {p.id})</span>
+                                      </li>
+                                  ))}
+                                </ul>
+                              </div>
+                          )}
                           <div className="mt-1">
                             Entrega:{' '}
                             <strong>
@@ -527,223 +567,3 @@ export function EnVivoPage() {
   );
 }
 export default EnVivoPage;
-/*
-import { useState, useEffect, useRef } from 'react';
-import { MapViewTemporal } from '@/features/map/components';
-import { ejecutarAlgoritmoDiario, type AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
-import { useAirportsForMap } from '@/features/map/hooks';
-
-export function EnVivoPage() {
-
-  const [dataCargada, setDataCargada] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [resultadoVentana, setResultadoVentana] = useState<AlgoritmoResponse | null>(null);
-
-  // --------------------------------------
-  // FORMATEAR FECHA A LOCAL yyyy-MM-ddTHH:mm:ss
-  // --------------------------------------
-  function toLocalIsoNoZ(date: Date) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-
-    const y = date.getFullYear();
-    const m = pad(date.getMonth() + 1);
-    const d = pad(date.getDate());
-    const h = pad(date.getHours());     // <-- hora local REAL
-    const min = pad(date.getMinutes());
-    const s = pad(date.getSeconds());
-
-    return `${y}-${m}-${d}T${h}:${min}:${s}`;
-  }
-
-  // --------------------------------------
-  // HORA INICIAL = HORA LOCAL REAL DEL SISTEMA
-  // --------------------------------------
-  const [horaActual, setHoraActual] = useState(() => {
-    const now = new Date();
-    return toLocalIsoNoZ(now);
-  });
-
-  // Obtener estado de carga y refetch para forzar carga desde BD (useAirportsForMap está configurado con enabled: false)
-  const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
-
-  // ===========================
-  // AUTOMÁTICO
-  // ===========================
-  const [autoRun, setAutoRun] = useState(false);
-  // Intervalo por defecto en tiempo real: 60s
-  const [intervaloMs, setIntervaloMs] = useState(60000); // 60s por defecto
-
-  const autoRunRef = useRef(false);
-  autoRunRef.current = autoRun;
-
-  const ejecutarReferencia = useRef<() => Promise<void>>(async () => {});
-
-  // ===========================
-  // 1) Carga de datos
-  // ===========================
-  // Nota: ya no usamos una sección de carga de archivos en esta vista; iniciamos
-  // la operación día a día con el botón único.
-
-  // ===========================
-  // 2) Ejecutar una ventana
-  // ===========================
-  const ejecutarVentana = async () => {
-    if (isRunning) return;
-
-    setIsRunning(true);
-
-    const request = {
-      horaInicioSimulacion: horaActual,
-      duracionSimulacionHoras: 1,
-      usarBaseDatos: true,
-      maxIteraciones: 800,
-      tasaDestruccion: 0.3,
-      habilitarUnitizacion: true
-    };
-
-    try {
-      const resultado = await ejecutarAlgoritmoDiario(request);
-      setResultadoVentana(resultado);
-
-      // Refrescar aeropuertos tras recibir resultado para asegurar datos actualizados
-      try {
-        await refetchAirports();
-      } catch (e) {
-        console.warn('No se pudieron refrescar aeropuertos tras ejecutar ventana:', e);
-      }
-
-      // Avanzar la hora actual
-      const inicio = new Date(horaActual);
-      inicio.setHours(inicio.getHours() + 1);
-      setHoraActual(toLocalIsoNoZ(inicio));
-    } catch (e) {
-      console.error("Error ejecutando ventana:", e);
-      setAutoRun(false); // detener automático al fallar
-    }
-
-    setIsRunning(false);
-  };
-
-  // Guardar referencia de ejecutarVentana
-  ejecutarReferencia.current = ejecutarVentana;
-
-  // Iniciar operación día a día: marcar datos cargados, activar autoRun, refetch aeropuertos y ejecutar una ventana inmediata
-  const iniciarOperacionDiaria = async () => {
-    setDataCargada(true);
-    setAutoRun(false);
-    // Refrescar aeropuertos desde la BD para que el mapa pueda mostrarlos
-    try {
-      await refetchAirports();
-    } catch (e) {
-      console.warn('Advertencia: no se pudieron cargar los aeropuertos antes de iniciar la operación:', e);
-    }
-
-    // Ejecutar inmediatamente la primera ventana
-    try {
-      await ejecutarReferencia.current();
-    } catch (e) {
-      // En caso de error, detener autoRun
-      console.error('Error iniciando operación día a día:', e);
-      setAutoRun(false);
-    }
-  };
-
-  // ===========================
-  // Mecanismo del modo automático
-  // ===========================
-  useEffect(() => {
-    if (!autoRun) return;
-
-    const interval = setInterval(() => {
-      // Evitar múltiples ejecuciones simultáneas
-      if (!isRunning && autoRunRef.current) {
-        ejecutarReferencia.current();
-      }
-    }, intervaloMs);
-
-    return () => clearInterval(interval);
-  }, [autoRun, intervaloMs, isRunning]);
-
-  // ======================================================
-  // FRONT
-  // ======================================================
-  return (
-    <div className="h-full flex flex-col p-6">
-
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">
-        🔴 Simulación En Vivo
-      </h1>
-*/
-      {/* Paso 1: iniciar Operación día a día */}
- /*     {!dataCargada && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">1. Ejecutar Operación día a día</h2>
-          <p className="text-gray-600 mb-3">Inicia la operación día a día y ejecuta el algoritmo automáticamente.</p>
-
-          <button
-            onClick={iniciarOperacionDiaria}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-          >
-            Ejecutar Operación día a día
-          </button>
-        </div>
-      )}
-*/
-      {/* Paso 2: ejecución */}
- /*     {dataCargada && (
-        <>
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-2">2. Operaciones en tiempo real</h2>
-
-            <div className="flex items-center gap-4 mb-4">
-              <button
-                onClick={ejecutarVentana}
-                disabled={isRunning || autoRun}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
-              >
-                {isRunning ? "Procesando..." : "Procesar siguiente ventana ➜"}
-              </button>
-*/
-              {/* AUTO MODE */}
- /*             <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={autoRun}
-                  onChange={(e) => setAutoRun(e.target.checked)}
-                />
-                <span className="text-gray-700">Automático</span>
-              </label>
-
-              {autoRun && (
-                <input
-                  type="number"
-                  value={intervaloMs}
-                  onChange={(e) => setIntervaloMs(Number(e.target.value))}
-                  className="border p-2 rounded w-32"
-                  min={1000}
-                />
-              )}
-            </div>
-
-            <p className="mt-3 text-sm text-gray-500">
-              Hora actual de simulación: <strong>{horaActual}</strong>
-            </p>
-          </div>
-*/
-          {/* Mapa */}
- /*         <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
-            {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
-              <MapViewTemporal resultado={resultadoVentana} /*initialTimeUnit="seconds" autoPlay*/ /*/>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                {airportsLoading
-                  ? "Cargando aeropuertos..."
-                  : "Aún no hay ventanas procesadas."}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}*/

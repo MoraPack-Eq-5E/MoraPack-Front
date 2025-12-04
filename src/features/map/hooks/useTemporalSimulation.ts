@@ -31,6 +31,7 @@ export interface ActiveFlight {
   capacityMax?: number; // Capacidad máxima del vuelo
   cantidadProductos?: number; // Cantidad de productos en este vuelo
   windowIndex?: number;
+  windowIndexes?: number[];
 }
 
 export interface FlightCapacityEvent {
@@ -417,7 +418,7 @@ export function useTemporalSimulation({
     flightPairs.forEach(pair => {
       const { departureEvent, departureTime, arrivalTime } = pair;
       const hasDeparted = departureTime <= currentDateTime;
-      const windowIndex = (departureEvent as any).ventanaIndex;
+      const windowIndex = (departureEvent as unknown as { ventanaIndex?: number }).ventanaIndex;
       // Calcular arrival time efectivo (real o estimado)
       let effectiveArrivalTime = arrivalTime;
       if (!effectiveArrivalTime && hasDeparted) {
@@ -490,6 +491,7 @@ export function useTemporalSimulation({
 
       if (hasArrived && effectiveArrivalTime) {
         // ✅ Vuelo completado - pero solo marcar pedido como entregado si llegó al DESTINO FINAL
+        // Preferir campos del evento de llegada (arrivalEvent) para determinar el aeropuerto donde realmente llegó
         const destinoVuelo = departureEvent.ciudadDestino;
 
         if (departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0) {
@@ -534,6 +536,7 @@ export function useTemporalSimulation({
               ? [...departureEvent.idsPedidos]  // Copia del array
               : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
           if (orderIds.length > 0 && effectiveArrivalTime) {
+            // Preferir código IATA del evento de llegada
             const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
             const flightCode = departureEvent.codigoVuelo || `V${flightId}`;
             const esDestinoFinal = pair.arrivalEvent?.esDestinoFinal === true;
@@ -614,8 +617,21 @@ export function useTemporalSimulation({
           });
           // Sumar cantidad de productos
           existingFlight.cantidadProductos = (existingFlight.cantidadProductos || 0) + (departureEvent.cantidadProductos || 1);
+          // 🔹 Acumular ventanas
+          if (typeof windowIndex === 'number') {
+            const prev = existingFlight.windowIndexes ?? [];
+            if (!prev.includes(windowIndex)) {
+              existingFlight.windowIndexes = [...prev, windowIndex];
+            }
+            // opcional: mantenemos windowIndex como “última ventana”
+            existingFlight.windowIndex = windowIndex;
+          }
         } else {
           // Crear nuevo vuelo
+          let windowIndexes: number[] | undefined = undefined;
+          if (typeof windowIndex === 'number') {
+            windowIndexes = [windowIndex];
+          }
           flightsMap.set(flightPhysicalKey, {
             eventId: flightPhysicalKey, // Usar clave física como eventId
             flightId: departureEvent.idVuelo || 0,
@@ -631,7 +647,8 @@ export function useTemporalSimulation({
             progress,
             capacityMax: departureEvent.capacidadMaxima, // Capacidad del vuelo desde backend
             cantidadProductos: departureEvent.cantidadProductos || 1, // Cantidad de productos
-            windowIndex,
+            windowIndex: typeof windowIndex === 'number' ? windowIndex : undefined,
+            windowIndexes,
           });
         }
       } else {
@@ -668,9 +685,19 @@ export function useTemporalSimulation({
     const currentDateTime = new Date(simulationStartTime.getTime() + currentSimTime * 1000);
     let storageChanged = false;
     const newStorage = new Map(warehouseStorage);
-
+    const vueloVentanas = new Map<number, Set<number>>();
     flightPairs.forEach(pair => {
+
       const { departureEvent, arrivalEvent, departureTime, arrivalTime } = pair;
+      const idVuelo = departureEvent.idVuelo;
+      const ventana = (departureEvent as any).ventanaIndex;
+
+      if (typeof idVuelo === 'number' && typeof ventana === 'number') {
+        if (!vueloVentanas.has(idVuelo)) {
+          vueloVentanas.set(idVuelo, new Set());
+        }
+        vueloVentanas.get(idVuelo)!.add(ventana);
+      }
       const cantidadProductos = departureEvent.cantidadProductos || 1;
       // Usar códigos IATA (nuevos campos) con fallback a los campos legacy
       const origenCode = departureEvent.codigoIATAOrigen || departureEvent.ciudadOrigen;
@@ -801,6 +828,11 @@ export function useTemporalSimulation({
 
     if (storageChanged) {
       setWarehouseStorage(newStorage);
+    }
+    for (const [id, ventanas] of vueloVentanas) {
+      if (ventanas.size > 1) {
+        console.log('⛔ Vuelo con múltiples ventanas', id, Array.from(ventanas));
+      }
     }
   }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage, addSimulationEvent]);
 
