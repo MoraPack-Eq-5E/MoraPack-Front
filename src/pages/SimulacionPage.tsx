@@ -5,57 +5,47 @@
  * 1. Cargar pedidos desde archivos a BD (POST /api/datos/cargar-pedidos)
  * 2. Ejecutar algoritmo semanal (POST /api/algoritmo/semanal)
  * 3. Consultar y visualizar resultados (GET /api/consultas/*)
+ * 
+ * NOTA: Usa Zustand store para persistir el estado entre navegaciones.
+ * La simulación continúa en background cuando el usuario navega a otras páginas.
  */
 
-import { useState } from 'react';
 import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import {
-  obtenerEstadoDatosNoDiario,
-  type CargaDatosResponse,
-  type EstadoDatosResponse
-} from '@/services/cargaDatos.service';
+import { obtenerEstadoDatosNoDiario } from '@/services/cargaDatos.service';
 import { ejecutarAlgoritmoSemanal, 
   ejecutarAlgoritmoColapso,
-  type AlgoritmoRequest, type AlgoritmoResponse,
-  type ResultadoColapsoDTO
+  type AlgoritmoResponse,
 } from '@/services/algoritmoSemanal.service';
 import { consultarEstadisticasAsignacion, consultarVuelos, consultarPedidos } from '@/services/consultas.service';
 import { MapViewTemporal } from '@/features/map/components';
 import { useAirportsForMap } from '@/features/map/hooks';
-
-type SimulationStep = 'load-data' | 'config' | 'running' | 'results';
-type ModoSimulacion = 'SEMANAL' | 'COLAPSO';
+import { useSimulationStore } from '@/store';
 
 export function SimulacionPage() {
-  const [currentStep, setCurrentStep] = useState<SimulationStep>('load-data');
-  const [modoSimulacion, setModoSimulacion] = useState<ModoSimulacion>('SEMANAL');
-
-  // Estado de carga de datos
-  const [dataCargada, setDataCargada] = useState(false);
-  const [resultadoCarga, setResultadoCarga] = useState<CargaDatosResponse | null>(null);
-  const [estadoDatos, setEstadoDatos] = useState<EstadoDatosResponse | null>(null);
-  
-  // Estado del algoritmo - ahora puede ser de ambos tipos
-  const [resultadoAlgoritmo, setResultadoAlgoritmo] = useState<AlgoritmoResponse | 
-        ResultadoColapsoDTO | null>(null);
-  
-  // Estados de UI
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // === Estado global de Zustand (persiste entre navegaciones) ===
+  const {
+    currentStep,
+    setCurrentStep,
+    modoSimulacion,
+    setModoSimulacion,
+    dataCargada,
+    setDataCargada,
+    resultadoCarga,
+    setResultadoCarga,
+    estadoDatos,
+    setEstadoDatos,
+    resultadoAlgoritmo,
+    setResultadoAlgoritmo,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+    config,
+    setConfig,
+  } = useSimulationStore();
   
   // Hook para obtener aeropuertos
   const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
-  
-  // Configuración del algoritmo semanal (simplificada)
-  const [config, setConfig] = useState<AlgoritmoRequest>({
-    horaInicioSimulacion: '2025-01-02T00:00:00',
-    duracionSimulacionDias: 7,
-    usarBaseDatos: true,
-    // Parámetros fijos optimizados (no configurables por usuario)
-    maxIteraciones: 1000,
-    tasaDestruccion: 0.3,
-    habilitarUnitizacion: true,
-  });
   
   // ==================== PASO 1: CARGA DE DATOS ====================
   
@@ -426,7 +416,6 @@ export function SimulacionPage() {
                       value={config.horaInicioSimulacion?.slice(0, 16)}
                       onChange={(e) =>
                         setConfig({
-                          ...config,
                           horaInicioSimulacion: e.target.value + ':00',
                         })
                       }
@@ -442,7 +431,6 @@ export function SimulacionPage() {
                       value={config.duracionSimulacionDias}
                       onChange={(e) =>
                         setConfig({
-                          ...config,
                           duracionSimulacionDias: parseInt(e.target.value),
                         })
                       }
