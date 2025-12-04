@@ -15,7 +15,7 @@ import {
   type CargaDatosResponse,
   type EstadoDatosResponse
 } from '@/services/cargaDatos.service';
-import { ejecutarAlgoritmoSemanal, 
+import { ejecutarAlgoritmoSemanal,
   ejecutarAlgoritmoColapso,
   type AlgoritmoRequest, type AlgoritmoResponse,
   type ResultadoColapsoDTO
@@ -43,7 +43,7 @@ export function SimulacionPage() {
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Hook para obtener aeropuertos
   const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
   
@@ -157,7 +157,7 @@ export function SimulacionPage() {
     try {
       console.log(`🚀 Ejecutando algoritmo en modo ${modoSimulacion}...`);
       console.log('Configuración:', config);
-      
+
       let resultado;
       if (modoSimulacion === 'SEMANAL') {
         resultado = await ejecutarAlgoritmoSemanal(config);
@@ -165,20 +165,19 @@ export function SimulacionPage() {
         // Modo COLAPSO
         resultado = await ejecutarAlgoritmoColapso(config);
       }
-      
       setResultadoAlgoritmo(resultado);
-      
+
       console.log(`✅ Algoritmo ${modoSimulacion} completado:`, {
         productosAsignados: 'productosAsignados' in resultado ? resultado.productosAsignados : 'N/A',
         pedidosAsignados: 'pedidosAsignados' in resultado ? resultado.pedidosAsignados : 'N/A',
         segundosEjecucion: 'tiempoEjecucionSegundos' in resultado ? resultado.tiempoEjecucionSegundos : resultado.duracionSegundos,
       });
-      
+
       // Esperar un momento para que se persistan los datos
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setCurrentStep('results');
-      
+
     } catch (err) {
       console.error('❌ Error ejecutando algoritmo:', err);
       setError(err instanceof Error ? err.message : 'Error al ejecutar algoritmo');
@@ -187,7 +186,7 @@ export function SimulacionPage() {
       setIsLoading(false);
     }
   };
-  
+
   // ==================== PASO 3: CONSULTAR RESULTADOS ====================
   
   const handleVerResultados = async () => {
