@@ -9,11 +9,13 @@
  * - Tracking de vuelos activos
  * - Estadísticas en tiempo real
  * - Formateo de tiempo
+ * - NUEVO: Sincroniza con Zustand store para persistir entre navegaciones
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LineaDeTiempoSimulacionDTO, EventoLineaDeTiempoVueloDTO } from '@/services/algoritmoSemanal.service';
 import type { SimulationEvent, SimulationEventType } from '@/types/simulation.types';
+import { useSimulationStore } from '@/store';
 
 export interface ActiveFlight {
   eventId: string; // ID único del evento (para diferenciar instancias del mismo vuelo)
@@ -81,24 +83,23 @@ interface UseTemporalSimulationProps {
   aeropuertos?: AeropuertoInfo[];  // Aeropuertos con capacidad inicial
 }
 
-function getSecondsPerRealSecond(timeUnit: TimeUnit): number {
-  switch (timeUnit) {
-    case 'seconds': return 1;      // 1 seg real = 1 seg simulado
-    case 'minutes': return 60;     // 1 seg real = 1 min simulado
-    case 'hours': return 3600;     // 1 seg real = 1 hora simulada
-    case 'days': return 86400;     // 1 seg real = 1 día simulado
-  }
-}
-
 export function useTemporalSimulation({
                                         timeline,
-                                        timeUnit = 'hours',
+                                        // timeUnit ya no se usa aquí - el store maneja la velocidad
                                         onFlightCapacityChange,
                                         aeropuertos,
                                       }: UseTemporalSimulationProps) {
-  // Estados principales
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSimTime, setCurrentSimTime] = useState(0); // segundos desde inicio
+  // === Estados de reproducción desde el store global (persisten entre navegaciones) ===
+  const {
+    isPlaying,
+    currentSimTime,
+    play: storePlay,
+    pause: storePause,
+    reset: storeReset,
+    seek: storeSeek,
+  } = useSimulationStore();
+  
+  // === Estados locales del hook (se recalculan cuando el componente se monta) ===
   const [activeFlights, setActiveFlights] = useState<ActiveFlight[]>([]);
   const [completedOrdersCount, setCompletedOrdersCount] = useState(0);
   const [flightStats, setFlightStats] = useState({
@@ -112,8 +113,6 @@ export function useTemporalSimulation({
 
   // Estado de almacenamiento por aeropuerto (código IATA -> estado)
   const [warehouseStorage, setWarehouseStorage] = useState<Map<string, WarehouseState>>(new Map());
-
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Rastrear qué eventos de capacidad ya se han disparado para evitar duplicados
   const processedCapacityEventsRef = useRef<Set<string>>(new Set());
@@ -195,9 +194,6 @@ export function useTemporalSimulation({
       // console.log(`[useTemporalSimulation] Almacenes inicializados: ${initialStorage.size} aeropuertos`);
     }
   }, [aeropuertos]);
-
-  // Velocidad de reproducción
-  const playbackSpeed = useMemo(() => getSecondsPerRealSecond(timeUnit), [timeUnit]);
 
   // Hora de inicio de simulación
   const simulationStartTime = useMemo(() => {
@@ -836,50 +832,21 @@ export function useTemporalSimulation({
     }
   }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage, addSimulationEvent]);
 
-  // Control de reproducción con interval
-  useEffect(() => {
-    if (isPlaying && timeline) {
-      intervalRef.current = setInterval(() => {
-        setCurrentSimTime(prev => {
-          const newTime = prev + playbackSpeed / 5; // Actualizar 5 veces por segundo
-          
-          if (newTime >= totalDurationSeconds) {
-            setIsPlaying(false);
-            return totalDurationSeconds;
-          }
+  // === El control de reproducción (interval) ahora está en el store global ===
+  // El store maneja el interval, así que el playback continúa aunque el componente se desmonte
 
-          return newTime;
-        });
-      }, 200); // 200ms intervals - reduce carga para permitir interacción
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isPlaying, playbackSpeed, totalDurationSeconds, timeline]);
-
-  // Controles
+  // Controles - ahora usan las funciones del store
   const play = useCallback(() => {
-    setCurrentSimTime(prev => {
-      // Si llegamos al final, reiniciar
-      if (prev >= totalDurationSeconds) return 0;
-      return prev;
-    });
-    setIsPlaying(true);
-  }, [totalDurationSeconds]);
+    storePlay();
+  }, [storePlay]);
 
   const pause = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+    storePause();
+  }, [storePause]);
 
   const reset = useCallback(() => {
-    setIsPlaying(false);
-    setCurrentSimTime(0);
+    // Primero llamar al reset del store
+    storeReset();
 
     // Limpiar eventos de capacidad procesados
     processedCapacityEventsRef.current.clear();
@@ -904,11 +871,11 @@ export function useTemporalSimulation({
       });
       setWarehouseStorage(initialStorage);
     }
-  }, [aeropuertos]);
+  }, [aeropuertos, storeReset]);
 
   const seek = useCallback((seconds: number) => {
-    setCurrentSimTime(Math.max(0, Math.min(totalDurationSeconds, seconds)));
-  }, [totalDurationSeconds]);
+    storeSeek(seconds);
+  }, [storeSeek]);
 
   // Formatear tiempo como "1d 12:30:45" o "12:30:45"
   const formatSimulationTime = useCallback((seconds: number): string => {

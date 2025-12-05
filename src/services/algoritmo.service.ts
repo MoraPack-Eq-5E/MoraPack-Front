@@ -102,7 +102,7 @@ export interface ResultadoAlgoritmoDTO {
   rutas?: RutaDTO[];
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Ejecuta el algoritmo ALNS y obtiene resultados + línea de tiempo

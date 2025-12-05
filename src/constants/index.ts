@@ -6,7 +6,7 @@
 
 // URLs y endpoints
 export const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || '/api';
+    import.meta.env.VITE_API_URL || '/api';
 
 // Configuración de la app
 export const APP_NAME = 'MoraPack Admin';

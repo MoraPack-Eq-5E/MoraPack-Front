@@ -5,58 +5,47 @@
  * 1. Cargar pedidos desde archivos a BD (POST /api/datos/cargar-pedidos)
  * 2. Ejecutar algoritmo semanal (POST /api/algoritmo/semanal)
  * 3. Consultar y visualizar resultados (GET /api/consultas/*)
+ * 
+ * NOTA: Usa Zustand store para persistir el estado entre navegaciones.
+ * La simulación continúa en background cuando el usuario navega a otras páginas.
  */
 
-import { useState } from 'react';
 import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
-import {
-  cargarPedidos,
-  obtenerEstadoDatosNoDiario,
-  type CargaDatosResponse,
-  type EstadoDatosResponse
-} from '@/services/cargaDatos.service';
+import { obtenerEstadoDatosNoDiario } from '@/services/cargaDatos.service';
 import { ejecutarAlgoritmoSemanal, 
   ejecutarAlgoritmoColapso,
-  type AlgoritmoRequest, type AlgoritmoResponse,
-  type ResultadoColapsoDTO
+  type AlgoritmoResponse,
 } from '@/services/algoritmoSemanal.service';
 import { consultarEstadisticasAsignacion, consultarVuelos, consultarPedidos } from '@/services/consultas.service';
 import { MapViewTemporal } from '@/features/map/components';
 import { useAirportsForMap } from '@/features/map/hooks';
-
-type SimulationStep = 'load-data' | 'config' | 'running' | 'results';
-type ModoSimulacion = 'SEMANAL' | 'COLAPSO';
+import { useSimulationStore } from '@/store';
 
 export function SimulacionPage() {
-  const [currentStep, setCurrentStep] = useState<SimulationStep>('load-data');
-  const [modoSimulacion, setModoSimulacion] = useState<ModoSimulacion>('SEMANAL');
-
-  // Estado de carga de datos
-  const [dataCargada, setDataCargada] = useState(false);
-  const [resultadoCarga, setResultadoCarga] = useState<CargaDatosResponse | null>(null);
-  const [estadoDatos, setEstadoDatos] = useState<EstadoDatosResponse | null>(null);
-  
-  // Estado del algoritmo - ahora puede ser de ambos tipos
-  const [resultadoAlgoritmo, setResultadoAlgoritmo] = useState<AlgoritmoResponse | 
-        ResultadoColapsoDTO | null>(null);
-  
-  // Estados de UI
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // === Estado global de Zustand (persiste entre navegaciones) ===
+  const {
+    currentStep,
+    setCurrentStep,
+    modoSimulacion,
+    setModoSimulacion,
+    dataCargada,
+    setDataCargada,
+    resultadoCarga,
+    setResultadoCarga,
+    estadoDatos,
+    setEstadoDatos,
+    resultadoAlgoritmo,
+    setResultadoAlgoritmo,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+    config,
+    setConfig,
+  } = useSimulationStore();
   
   // Hook para obtener aeropuertos
   const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
-  
-  // Configuración del algoritmo semanal (simplificada)
-  const [config, setConfig] = useState<AlgoritmoRequest>({
-    horaInicioSimulacion: '2025-01-02T00:00:00',
-    duracionSimulacionDias: 7,
-    usarBaseDatos: true,
-    // Parámetros fijos optimizados (no configurables por usuario)
-    maxIteraciones: 1000,
-    tasaDestruccion: 0.3,
-    habilitarUnitizacion: true,
-  });
   
   // ==================== PASO 1: CARGA DE DATOS ====================
   
@@ -106,42 +95,6 @@ export function SimulacionPage() {
     }
   };
   
-  const handleCargarDatosSinArchivos = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      console.log('📥 Cargando pedidos desde directorio del servidor...');
-      
-      // IMPORTANTE: Refetch de aeropuertos por si fueron cargados en el servidor
-      await refetchAirports();
-      
-      const resultado = await cargarPedidos({
-        modo: modoSimulacion, // 'SEMANAL' o 'COLAPSO'
-        horaInicio: modoSimulacion === 'SEMANAL' ? config.horaInicioSimulacion : undefined,
-        horaFin:
-        modoSimulacion === 'SEMANAL'
-          ? calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!)
-          : undefined,
-      });
-      
-      setResultadoCarga(resultado);
-      setDataCargada(true);
-      
-      // Obtener estado de datos
-      const estado = await obtenerEstadoDatosNoDiario();
-      setEstadoDatos(estado);
-      
-      console.log('✅ Datos cargados:', resultado.estadisticas);
-      
-    } catch (err) {
-      console.error('❌ Error cargando datos:', err);
-      setError(err instanceof Error ? err.message : 'Error al cargar datos');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   const handleContinueToConfig = () => {
     setCurrentStep('config');
     setError(null);
@@ -157,7 +110,7 @@ export function SimulacionPage() {
     try {
       console.log(`🚀 Ejecutando algoritmo en modo ${modoSimulacion}...`);
       console.log('Configuración:', config);
-      
+
       let resultado;
       if (modoSimulacion === 'SEMANAL') {
         resultado = await ejecutarAlgoritmoSemanal(config);
@@ -165,20 +118,19 @@ export function SimulacionPage() {
         // Modo COLAPSO
         resultado = await ejecutarAlgoritmoColapso(config);
       }
-      
       setResultadoAlgoritmo(resultado);
-      
+
       console.log(`✅ Algoritmo ${modoSimulacion} completado:`, {
         productosAsignados: 'productosAsignados' in resultado ? resultado.productosAsignados : 'N/A',
         pedidosAsignados: 'pedidosAsignados' in resultado ? resultado.pedidosAsignados : 'N/A',
         segundosEjecucion: 'tiempoEjecucionSegundos' in resultado ? resultado.tiempoEjecucionSegundos : resultado.duracionSegundos,
       });
-      
+
       // Esperar un momento para que se persistan los datos
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setCurrentStep('results');
-      
+
     } catch (err) {
       console.error('❌ Error ejecutando algoritmo:', err);
       setError(err instanceof Error ? err.message : 'Error al ejecutar algoritmo');
@@ -187,7 +139,7 @@ export function SimulacionPage() {
       setIsLoading(false);
     }
   };
-  
+
   // ==================== PASO 3: CONSULTAR RESULTADOS ====================
   
   const handleVerResultados = async () => {
@@ -416,7 +368,7 @@ export function SimulacionPage() {
               Paso 1: Cargar Pedidos a Base de Datos
             </h2>
             <p className="text-gray-600 mb-6">
-              Carga archivos de pedidos desde tu equipo o usa los archivos del servidor
+              Carga archivos de pedidos desde tu equipo
             </p>
             
             {/* Selector de modo */}
@@ -463,7 +415,6 @@ export function SimulacionPage() {
                       value={config.horaInicioSimulacion?.slice(0, 16)}
                       onChange={(e) =>
                         setConfig({
-                          ...config,
                           horaInicioSimulacion: e.target.value + ':00',
                         })
                       }
@@ -479,7 +430,6 @@ export function SimulacionPage() {
                       value={config.duracionSimulacionDias}
                       onChange={(e) =>
                         setConfig({
-                          ...config,
                           duracionSimulacionDias: parseInt(e.target.value),
                         })
                       }
@@ -519,9 +469,9 @@ export function SimulacionPage() {
               </div>
             )}
 
-            {/* Opción 1: Importar archivos */}
+            {/* Importar archivos */}
             <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Opción 1: Subir archivos desde tu equipo</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">Subir archivos desde tu equipo</h3>
               <FileUploadSection 
                 onValidationSuccess={handleFileImportSuccess} 
                 horaInicio={modoSimulacion === 'SEMANAL' ? config.horaInicioSimulacion : undefined}
@@ -537,21 +487,6 @@ export function SimulacionPage() {
                  console.log('[SimulacionPage] Se recibió onClear: estado de carga reseteado');
                }}
               />
-            </div>
-            
-            {/* Opción 2: Usar archivos del servidor */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Opción 2: Usar archivos del servidor</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Carga pedidos desde el directorio <code className="bg-gray-100 px-2 py-1 rounded">data/</code> del servidor
-              </p>
-              <button
-                onClick={handleCargarDatosSinArchivos}
-                disabled={isLoading}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300 font-medium"
-              >
-                {isLoading ? 'Cargando...' : 'Cargar desde servidor'}
-              </button>
             </div>
             
             {/* Resultado de carga */}

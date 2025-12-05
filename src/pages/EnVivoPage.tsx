@@ -7,7 +7,8 @@
  * 2. Ejecutar ventanas manual o automáticamente
  * 3. Mostrar resultados por ventana
  */
-import React, { useState, useEffect, useRef, useMemo, FormEvent } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import type { FormEvent } from 'react';
 import { MapViewTemporal } from '@/features/map/components';
 import {
   ejecutarAlgoritmoDiario,
