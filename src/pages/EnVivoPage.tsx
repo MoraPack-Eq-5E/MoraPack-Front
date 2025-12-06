@@ -13,7 +13,9 @@ import { MapViewTemporal } from '@/features/map/components';
 import {
   ejecutarAlgoritmoDiario,
   type AlgoritmoResponse,
-  type LineaDeTiempoSimulacionDTO
+  type LineaDeTiempoSimulacionDTO,
+  type RutaProductoDTO,
+  type EventoLineaDeTiempoVueloDTO
 } from '@/services/algoritmoSemanal.service';
 import { useAirportsForMap } from '@/features/map/hooks';
 import { crearPedidoDiaADia } from '@/services/pedido.service';
@@ -48,7 +50,6 @@ export function EnVivoPage() {
   const [intervaloMs, setIntervalMs] = useState(60000); // 1 min para pruebas, luego 3600000
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
-
   const { isLoading: airportsLoading, refetch: refetchAirports } =
       useAirportsForMap();
   // ---- Registro manual de pedidos (operación día a día) ----
@@ -81,13 +82,12 @@ export function EnVivoPage() {
 
     const rutas = resultado.lineaDeTiempo?.rutasProductos ?? [];
 
-    rutas.forEach((ruta: any) => {
+    rutas.forEach((ruta: RutaProductoDTO) => {
       const id = ruta.idPedido as number | undefined;
       if (id == null) return;
 
       const nombre =
           (ruta.nombrePedido as string | undefined) ||
-          (ruta.nombre as string | undefined) ||
           `Pedido #${id}`;
 
       if (!mapa.has(id)) {
@@ -164,7 +164,7 @@ export function EnVivoPage() {
       ...resultado,
       lineaDeTiempo: {
         ...resultado.lineaDeTiempo,
-        eventos: resultado.lineaDeTiempo.eventos.map((e: any) => ({
+        eventos: resultado.lineaDeTiempo.eventos.map((e: EventoLineaDeTiempoVueloDTO) => ({
           ...e,
           ventanaIndex,  // <-- campo extra solo usado en frontend
         })),
@@ -179,7 +179,7 @@ export function EnVivoPage() {
     if (!linea?.eventos) return [];
     const set = new Set<number>();
 
-    linea.eventos.forEach((event: any) => {
+    linea.eventos.forEach((event: EventoLineaDeTiempoVueloDTO) => {
       if (event.idsPedidos && event.idsPedidos.length > 0) {
         event.idsPedidos.forEach((id: number) => set.add(id));
       } else if (event.idPedido) {
@@ -273,8 +273,6 @@ export function EnVivoPage() {
 
     await ejecutarReferencia.current();
   };
-
-  // modo automático: dispara ejecutarVentana cada intervaloMs
   useEffect(() => {
     if (!autoRun) return;
 
@@ -286,7 +284,7 @@ export function EnVivoPage() {
 
     return () => clearInterval(interval);
   }, [autoRun, intervaloMs, isRunning]);
-  const handleSubmitNuevoPedido = async (e: React.FormEvent) => {
+  const handleSubmitNuevoPedido = async (e: FormEvent) => {
     e.preventDefault();
     setPedidoError(null);
 
@@ -315,14 +313,14 @@ export function EnVivoPage() {
       setCantidadProductos('');
 
       // Opcional: puedes mostrar un toast, por ahora uso alert
-      // eslint-disable-next-line no-alert
       alert(
           `Pedido registrado correctamente (ID ${nuevoId}). ` +
           `Se asignará en la próxima ventana que ejecutes.`
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error registrando pedido:', err);
-      setPedidoError(err?.message ?? 'Error inesperado al registrar el pedido.');
+      const message = err instanceof Error ? err.message : String(err);
+      setPedidoError(message || 'Error inesperado al registrar el pedido.');
     } finally {
       setIsSavingPedido(false);
     }
@@ -400,9 +398,9 @@ export function EnVivoPage() {
                 </p>
               </div>
 
-              <div className="flex-1 flex gap-4 min-h-0">
+              <div className="flex-1 relative min-h-0">
                 {/* Mapa */}
-                <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
+                <div className="absolute inset-0 z-0 border rounded-xl overflow-hidden bg-gray-50">
                   {resultadoGlobalParaMapa && !airportsLoading ? (
                       <MapViewTemporal
                           resultado={resultadoGlobalParaMapa}
@@ -493,7 +491,7 @@ export function EnVivoPage() {
                     </div>
                 )}
                 {/* Panel derecho con info por ventana */}
-                <div className="w-80 border rounded-xl p-3 bg-white overflow-y-auto">
+                <div className="absolute top-24 left-6 z-40 w-80 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-2xl rounded-xl p-3 max-h-[60vh] overflow-y-auto">
                   <h3 className="font-semibold mb-2">
                     Ventanas procesadas ({ventanas.length})
                   </h3>
