@@ -329,6 +329,25 @@ export function useTemporalSimulation({
 
     return map;
   }, [timeline]);
+  useEffect(() => {
+    // Debug: ver qué pedidos están marcados con OMDB como destino final
+    const debug: number[] = [];
+    orderFinalDestinations.forEach((dest, idPedido) => {
+      if (dest === 'LOWW') debug.push(idPedido);
+    });
+    if (debug.length > 0) {
+      console.log('[DEBUG destinos finales OMDB] pedidos:', debug);
+    }
+  }, [orderFinalDestinations]);
+
+  const isFinalDestinationForOrders = useCallback(
+      (airportCode: string | undefined | null, orderIds: number[]): boolean => {
+        if (!airportCode || orderIds.length === 0) return false;
+
+        return orderIds.some(id => orderFinalDestinations.get(id) === airportCode);
+      },
+      [orderFinalDestinations]
+  );
 
   // NUEVO: Mapa de idVuelo → tiempos reales calculados por ALNS
   // Estructura: Map<idVuelo, { horaSalidaReal, horaLlegadaReal }>
@@ -349,7 +368,7 @@ export function useTemporalSimulation({
         }
       });
     }
-
+    console.log("[flightRealTimes]", Array.from(map.entries()));
     return map;
   }, [timeline]);
 
@@ -408,7 +427,11 @@ export function useTemporalSimulation({
           } else {
             arrivalTime = null;
           }
-
+          console.log("[flightPairs] vuelo", flightId, {
+            departureTime,
+            arrivalTime,
+            fromRealTimes: !!realTimes?.horaSalidaReal,
+          });
           return {
             departureEvent: departure,
             arrivalEvent: arrival,
@@ -511,7 +534,9 @@ export function useTemporalSimulation({
       if (hasArrived && effectiveArrivalTime) {
         // ✅ Vuelo completado - pero solo marcar pedido como entregado si llegó al DESTINO FINAL
         // Preferir campos del evento de llegada (arrivalEvent) para determinar el aeropuerto donde realmente llegó
-        const destinoVuelo = departureEvent.ciudadDestino;
+        //const destinoVuelo = departureEvent.ciudadDestino;
+        const destinoVuelo =
+            departureEvent.codigoIATADestino || departureEvent.ciudadDestino;
 
         if (departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0) {
           departureEvent.idsPedidos.forEach(id => {
@@ -556,11 +581,11 @@ export function useTemporalSimulation({
               : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
           if (orderIds.length > 0 && effectiveArrivalTime) {
             // Preferir código IATA del evento de llegada
-            const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
+            /*const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
             const flightCode = departureEvent.codigoVuelo || `V${flightId}`;
-            const esDestinoFinal = pair.arrivalEvent?.esDestinoFinal === true;
+            const esDestinoFinal = pair.arrivalEvent?.esDestinoFinal === true;*/
             
-            const orderText = orderIds.length === 1 
+            /*const orderText = orderIds.length === 1
               ? `Pedido #${orderIds[0]}` 
               : `${orderIds.length} pedidos`;
             
@@ -592,7 +617,55 @@ export function useTemporalSimulation({
                   productCount: totalVolume,
                 }
               );
+            }*/
+            const destinoCode = departureEvent.codigoIATADestino || departureEvent.ciudadDestino || 'N/A';
+            const flightCode = departureEvent.codigoVuelo || `V${flightId}`;
+
+            // Lista de pedidos de este vuelo
+            const orderIds = departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
+                ? [...departureEvent.idsPedidos]
+                : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
+
+            // 1) lo que dice el back
+            const esDestinoFinalBack = pair.arrivalEvent?.esDestinoFinal === true;
+            // 2) lo que dice nuestro mapa de destinos finales
+            const esDestinoFinalMapa = isFinalDestinationForOrders(destinoCode, orderIds);
+
+            // Regla combinada: solo tratamos como final si al menos una de estas condiciones se cumple
+            const esDestinoFinal = esDestinoFinalBack || esDestinoFinalMapa;
+
+            const orderText = orderIds.length === 1
+                ? `Pedido #${orderIds[0]}`
+                : `${orderIds.length} pedidos`;
+
+            if (esDestinoFinal) {
+              addSimulationEvent(
+                  'ORDER_AT_DESTINATION',
+                  `${orderText} llegó a destino final ${destinoCode}`,
+                  effectiveArrivalTime,
+                  {
+                    flightId,
+                    flightCode,
+                    orderIds,
+                    airportCode: destinoCode,
+                    productCount: totalVolume,
+                  }
+              );
+            } else {
+              addSimulationEvent(
+                  'ORDER_ARRIVED_AIRPORT',
+                  `${orderText} llegó al aeropuerto ${destinoCode} (escala)`,
+                  effectiveArrivalTime,
+                  {
+                    flightId,
+                    flightCode,
+                    orderIds,
+                    airportCode: destinoCode,
+                    productCount: totalVolume,
+                  }
+              );
             }
+
           }
         }
       } else if (hasDeparted && effectiveArrivalTime) {
@@ -759,10 +832,22 @@ export function useTemporalSimulation({
           });
           storageChanged = true;
         }
-        
+        // Construir lista de pedidos de ese vuelo
+        const pedidosVuelo =
+            departureEvent.idsPedidos && departureEvent.idsPedidos.length > 0
+                ? [...departureEvent.idsPedidos]
+                : (departureEvent.idPedido ? [departureEvent.idPedido] : []);
+
+        // 1) flag que viene del back
+        const esDestinoFinalBack = arrivalEvent?.esDestinoFinal === true;
+        // 2) verificación con nuestro mapa
+        const esDestinoFinalMapa = isFinalDestinationForOrders(destinoCode, pedidosVuelo);
+
+        // Solo programar pickup si realmente es destino final
+        const esDestinoFinal = esDestinoFinalBack || esDestinoFinalMapa;
         // Solo programar pickup si es DESTINO FINAL (no escalas)
         // Verificar usando el campo esDestinoFinal del arrivalEvent
-        const esDestinoFinal = arrivalEvent?.esDestinoFinal === true;
+        //const esDestinoFinal = arrivalEvent?.esDestinoFinal === true;
         
         if (esDestinoFinal) {
           const pickupTime = new Date(effectiveArrivalTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
@@ -848,11 +933,11 @@ export function useTemporalSimulation({
     if (storageChanged) {
       setWarehouseStorage(newStorage);
     }
-    for (const [id, ventanas] of vueloVentanas) {
+    /*for (const [id, ventanas] of vueloVentanas) {
       if (ventanas.size > 1) {
         console.log('⛔ Vuelo con múltiples ventanas', id, Array.from(ventanas));
       }
-    }
+    }*/
   }, [currentSimTime, flightPairs, simulationStartTime, warehouseStorage, addSimulationEvent]);
   // Control de reproducción con interval
   useEffect(() => {

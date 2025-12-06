@@ -47,7 +47,7 @@ export function EnVivoPage() {
 
   // modo automático
   const [autoRun, setAutoRun] = useState(false);
-  const [intervaloMs, setIntervalMs] = useState(60000); // 1 min para pruebas, luego 3600000
+  const [intervaloMs, setIntervalMs] = useState(3600000); // 1 min (60000) para pruebas, luego 3600000
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
   const { isLoading: airportsLoading, refetch: refetchAirports } =
@@ -208,6 +208,10 @@ export function EnVivoPage() {
     const ventanaIndex = ventanas.length + 1;
     try {
       const resultadoCrudo = await ejecutarAlgoritmoDiario(request);
+      console.log(
+          '[DEBUG] rutasProductos crudo de esta ventana',
+          resultadoCrudo.lineaDeTiempo?.rutasProductos
+      );
 
       // 1) Decorar timeline con la ventana
       const resultado = annotateTimelineWithWindow(resultadoCrudo, ventanaIndex);
