@@ -9,7 +9,7 @@
  */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { MapViewTemporal } from '@/features/map/components';
+import { MapViewEnVivo } from '@/features/map/components';
 import {
   ejecutarAlgoritmoDiario,
   type AlgoritmoResponse,
@@ -19,6 +19,13 @@ import {
 } from '@/services/algoritmoSemanal.service';
 import { useAirportsForMap } from '@/features/map/hooks';
 import { crearPedidoDiaADia } from '@/services/pedido.service';
+import { toast } from '@/components/ui';
+import { FileUploadPedidosDiaADia } from './components/FileUploadPedidosDiaADiaFINAL';
+import {
+  obtenerEstadoDatosNoDiario,
+  type CargaDatosResponse,
+  type EstadoDatosResponse
+} from '@/services/cargaDatos.service';
 type PedidoVentana = {
   id: number;
   nombre: string;
@@ -35,6 +42,11 @@ type VentanaSimulacion = {
 export function EnVivoPage() {
   const [dataCargada, setDataCargada] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Estados para carga de archivos
+  const [archivosValidados, setArchivosValidados] = useState(false);
+  const [resultadoCarga, setResultadoCarga] = useState<CargaDatosResponse | null>(null);
+  const [estadoDatos, setEstadoDatos] = useState<EstadoDatosResponse | null>(null);
 
   const [horaActual, setHoraActual] = useState(() => {
     const now = new Date();
@@ -196,7 +208,7 @@ export function EnVivoPage() {
 
     const horaInicioVentana = horaActual;
     const horaFinVentana = addHours(horaInicioVentana, 1);
-
+    const esPrimeraVentana = ventanas.length === 0;
     const request = {
       horaInicioSimulacion: horaInicioVentana,
       duracionSimulacionHoras: 1,
@@ -204,6 +216,7 @@ export function EnVivoPage() {
       maxIteraciones: 800,
       tasaDestruccion: 0.3,
       habilitarUnitizacion: true,
+      inicioOperacionDiaADia: esPrimeraVentana,
     };
     const ventanaIndex = ventanas.length + 1;
     try {
@@ -252,6 +265,52 @@ export function EnVivoPage() {
       setAutoRun(false);
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  // Manejar éxito de carga de archivos
+  const handleFileImportSuccess = async (sessionId?: string) => {
+    try {
+      console.log('✅ Archivos de pedidos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
+      console.log('📊 Consultando estado de base de datos...');
+
+      // Refetch de aeropuertos después de importar
+      await refetchAirports();
+
+      // Obtener estado de datos desde BD
+      const estado = await obtenerEstadoDatosNoDiario();
+      setEstadoDatos(estado);
+
+      console.log('✅ Pedidos disponibles en BD:', estado.estadisticas);
+
+      setArchivosValidados(true);
+
+      // Crear resultado de carga para mostrar en UI
+      setResultadoCarga({
+        exito: true,
+        mensaje: 'Archivos de pedidos cargados exitosamente',
+        estadisticas: {
+          pedidosCargados: estado.estadisticas.totalPedidos,
+          pedidosCreados: estado.estadisticas.totalPedidos,
+          pedidosFiltrados: 0,
+          erroresParseo: 0,
+          erroresArchivos: 0,
+          duracionSegundos: 0,
+        },
+        tiempoInicio: new Date().toISOString(),
+        tiempoFin: new Date().toISOString(),
+      });
+
+      toast.success(
+        '¡Pedidos cargados!',
+        `${estado.estadisticas.totalPedidos} pedidos disponibles en la base de datos`
+      );
+    } catch (err) {
+      console.error('Error al consultar estado de datos:', err);
+      toast.error(
+        'Error al cargar pedidos',
+        err instanceof Error ? err.message : 'Error desconocido'
+      );
     }
   };
 
@@ -316,10 +375,10 @@ export function EnVivoPage() {
       setDestinoCodigo('');
       setCantidadProductos('');
 
-      // Opcional: puedes mostrar un toast, por ahora uso alert
-      alert(
-          `Pedido registrado correctamente (ID ${nuevoId}). ` +
-          `Se asignará en la próxima ventana que ejecutes.`
+      // Notificación bonita
+      toast.success(
+          '¡Pedido creado exitosamente!',
+          `Pedido #${nuevoId} registrado. Se asignará en la próxima ventana.`
       );
     } catch (err: unknown) {
       console.error('Error registrando pedido:', err);
@@ -334,83 +393,181 @@ export function EnVivoPage() {
       <div className="h-full flex flex-col p-6">
 
         {!dataCargada && (
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">
-                1. Ejecutar Operación día a día
-              </h2>
-              <p className="text-gray-600 mb-3">
-                Inicia la operación día a día. Se ejecutará una ventana de 1h
-                por vez.
-              </p>
+            <div className="mb-6 space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold mb-2">
+                  1. Cargar Pedidos
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Carga los archivos de pedidos desde tu equipo. Los datos se validarán.
+                </p>
 
-              <button
-                  onClick={iniciarOperacionDiaria}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-              >
-                Ejecutar Operación día a día
-              </button>
+                {/* Sección de carga de archivos - Solo Pedidos */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-4">
+                  <FileUploadPedidosDiaADia
+                    onValidationSuccess={handleFileImportSuccess}
+                    onClear={() => {
+                      setArchivosValidados(false);
+                      setResultadoCarga(null);
+                      setEstadoDatos(null);
+                      console.log('[EnVivoPage] Archivos limpiados');
+                    }}
+                  />
+                </div>
+
+                {/* Divisor con "o" */}
+                <div className="flex items-center gap-4 my-6">
+                  <div className="flex-1 border-t border-gray-300"></div>
+                  <span className="text-sm font-medium text-gray-500">o</span>
+                  <div className="flex-1 border-t border-gray-300"></div>
+                </div>
+
+                {/* Botón para usar datos existentes */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                    ¿Ya tienes datos en la base de datos?
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Si ya cargaste pedidos previamente o quieres usar los datos existentes,
+                    puedes iniciar la operación directamente sin cargar archivos nuevos.
+                  </p>
+                  <button
+                    onClick={iniciarOperacionDiaria}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                    Usar datos existentes y continuar
+                  </button>
+                </div>
+
+                {/* Resultado de carga */}
+                {resultadoCarga && archivosValidados && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
+                      <span className="text-xl">✓</span> Pedidos cargados exitosamente
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-green-700">Total de pedidos</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {resultadoCarga.estadisticas.pedidosCargados}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-green-700">Estado</p>
+                        <p className="text-lg font-semibold text-green-900">
+                          Listos para procesar
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Estado de la BD */}
+                {estadoDatos && archivosValidados && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-blue-900 mb-2">
+                      📊 Estado de la base de datos
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-blue-700">Pedidos totales</p>
+                        <p className="text-xl font-bold text-blue-900">
+                          {estadoDatos.estadisticas.totalPedidos}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-blue-700">Aeropuertos</p>
+                        <p className="text-xl font-bold text-blue-900">
+                          {estadoDatos.estadisticas.totalAeropuertos}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de iniciar operación (solo visible si hay archivos validados) */}
+              {archivosValidados && (
+                <div>
+                  <h2 className="text-xl font-semibold mb-2">
+                    2. Iniciar Operación día a día
+                  </h2>
+                  <p className="text-gray-600 mb-3">
+                    Los pedidos están listos. Inicia la operación día a día. Se ejecutará una ventana de 1h por vez.
+                  </p>
+
+                  <button
+                    onClick={iniciarOperacionDiaria}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-lg hover:shadow-xl transition-all"
+                  >
+                    ▶ Ejecutar Operación día a día
+                  </button>
+                </div>
+              )}
             </div>
         )}
 
         {dataCargada && (
             <>
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold mb-2">
-                  2. Operaciones en tiempo real
-                </h2>
-
-                <div className="flex flex-wrap items-center gap-4 mb-2">
-                  <button
-                      onClick={ejecutarVentana}
-                      disabled={isRunning || autoRun}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
-                  >
-                    {isRunning ? 'Procesando...' : 'Procesar siguiente ventana ➜'}
-                  </button>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        checked={autoRun}
-                        onChange={(e) => setAutoRun(e.target.checked)}
-                    />
-                    <span className="text-gray-700">Automático</span>
-                  </label>
-
-                  {autoRun && (
-                      <input
-                          type="number"
-                          value={intervaloMs}
-                          onChange={(e) => setIntervalMs(Number(e.target.value))}
-                          className="border p-2 rounded w-32"
-                          min={1000}
-                      />
-                  )}
-                </div>
-                {/* lado derecho: botón Registrar pedido */}
+              {/* Botón oculto para ejecutar ventana (funcional en background) */}
+              <div className="hidden">
                 <button
-                    type="button"
-                    onClick={() => setShowNewOrderPanel(true)}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm"
+                    onClick={ejecutarVentana}
+                    disabled={isRunning || autoRun}
                 >
-                  + Registrar pedido
+                  {isRunning ? 'Procesando...' : 'Procesar siguiente ventana ➜'}
                 </button>
-
-                <p className="mt-1 text-sm text-gray-500">
-                  Hora inicio próxima ventana:{' '}
-                  <strong>{horaActual}</strong>
-                </p>
               </div>
+
+              {/* Panel Automático - flotante arriba a la izquierda */}
+              <div className="absolute top-3 left-3 z-[1100] bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl px-4 py-2.5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                      type="checkbox"
+                      checked={autoRun}
+                      onChange={(e) => setAutoRun(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Automático</span>
+                  {autoRun && (
+                    <input
+                        type="number"
+                        value={intervaloMs}
+                        onChange={(e) => setIntervalMs(Number(e.target.value))}
+                        className="ml-2 w-24 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min={1000}
+                        placeholder="ms"
+                    />
+                  )}
+                </label>
+              </div>
+
+              {/* Botón Registrar Pedido flotante en la esquina superior derecha */}
+              <button
+                  type="button"
+                  onClick={() => setShowNewOrderPanel(true)}
+                  className="absolute top-3 right-3 z-[1100] px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-xl"
+              >
+                + Registrar pedido
+              </button>
+
 
               <div className="flex-1 relative min-h-0">
                 {/* Mapa */}
                 <div className="absolute inset-0 z-0 border rounded-xl overflow-hidden bg-gray-50">
                   {resultadoGlobalParaMapa && !airportsLoading ? (
-                      <MapViewTemporal
+                      <MapViewEnVivo
                           resultado={resultadoGlobalParaMapa}
                           initialTimeUnit="seconds"
                           autoPlay
                           onCompletedOrdersChange={setCompletedOrderIds}
+                          currentRealTime={new Date(horaActual)}
                       />
                   ) : (
                       <div className="h-full flex items-center justify-center text-gray-500">
@@ -422,7 +579,7 @@ export function EnVivoPage() {
                 </div>
                 {/* Panel flotante para registrar pedidos manuales */}
                 {showNewOrderPanel && (
-                    <div className="fixed right-6 top-24 z-50 w-80 bg-white border border-gray-200 shadow-2xl rounded-xl p-4">
+                    <div className="absolute right-3 top-14 z-[1200] w-80 bg-white border border-gray-200 shadow-2xl rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="font-semibold text-gray-900 text-sm">
                           Registrar pedido (día a día)
@@ -494,9 +651,9 @@ export function EnVivoPage() {
                       </form>
                     </div>
                 )}
-                {/* Panel derecho con info por ventana */}
-                <div className="absolute top-24 left-6 z-40 w-80 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-2xl rounded-xl p-3 max-h-[60vh] overflow-y-auto">
-                  <h3 className="font-semibold mb-2">
+                {/* Panel con info por ventana - posicionado más abajo */}
+                <div className="absolute bottom-3 left-3 z-40 w-80 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-2xl rounded-xl p-3 max-h-[40vh] overflow-y-auto">
+                  <h3 className="font-semibold mb-2 text-sm">
                     Ventanas procesadas ({ventanas.length})
                   </h3>
                   {ventanas.map((v) => {

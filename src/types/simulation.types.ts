@@ -94,6 +94,7 @@ export interface SimulationMetrics {
 export type SimulationEventType = 
   | 'FLIGHT_DEPARTURE' 
   | 'FLIGHT_ARRIVAL' 
+  | 'FLIGHT_CANCELED'
   | 'ORDER_DEPARTED'
   | 'ORDER_ARRIVED_AIRPORT'
   | 'ORDER_AT_DESTINATION'

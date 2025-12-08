@@ -10,6 +10,7 @@ export * from './StatsCard';
 export * from './LoadingOverlay';
 export * from './MapView';
 export * from './MapViewTemporal';
+export * from './MapViewEnVivo';
 export * from './OccupancyLegend';
 export * from './SimulationCompleteModal';
 export * from './SimulationControls';

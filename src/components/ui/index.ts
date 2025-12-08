@@ -22,3 +22,5 @@ export type { CheckboxProps } from './checkbox';
 export { Select } from './select';
 export type { SelectProps, SelectOption } from './select';
 
+export { toast, showToast } from './toast';
+export type { ToastType } from './toast';
