@@ -399,26 +399,38 @@ export function EnVivoPage() {
       setIsSavingPedido(false);
     }
   };
+  const emptyResultado: AlgoritmoResponse = {
+    exito: true,
+    mensaje: 'Sin datos aún',
+    tiempoInicioEjecucion: horaActual,
+    tiempoFinEjecucion: horaActual,
+    tiempoEjecucionSegundos: 0,
+    totalPedidos: 0,
+    pedidosAsignados: 0,
+    pedidosNoAsignados: 0,
+    totalProductos: 0,
+    productosAsignados: 0,
+    productosNoAsignados: 0,
+  };
   // -------------- RENDER --------------
   return (
       <div className="h-full flex flex-col relative">
         {/* Mapa visible inmediatamente - sin condición */}
         <div className="flex-1 relative min-h-0">
           <div className="absolute inset-0 z-0 bg-gray-50">
-            {resultadoGlobalParaMapa && !airportsLoading ? (
+            {airportsLoading ? (
+                <div className="h-full flex items-center justify-center text-gray-500">
+                  Cargando aeropuertos...
+                </div>
+            ) : (
                 <MapViewEnVivo
-                    resultado={resultadoGlobalParaMapa as AlgoritmoResponse}
+                    // si ya hay ventanas, usa el resultado real; si no, usa el vacío
+                    resultado={(resultadoGlobalParaMapa ?? emptyResultado) as AlgoritmoResponse}
                     initialTimeUnit="seconds"
-                    autoPlay
+                    autoPlay={!!resultadoGlobalParaMapa} // solo autoPlay cuando ya hay timeline
                     onCompletedOrdersChange={setCompletedOrderIds}
                     currentRealTime={new Date(horaActual)}
                 />
-            ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  {airportsLoading
-                      ? 'Cargando aeropuertos...'
-                      : 'Sistema en tiempo real listo. Carga pedidos para comenzar la operación.'}
-                </div>
             )}
           </div>
 

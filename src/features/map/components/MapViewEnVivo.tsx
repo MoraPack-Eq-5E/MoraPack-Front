@@ -476,7 +476,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
     );
   }
 
-  if (!resultado.lineaDeTiempo) {
+  /*if (!resultado.lineaDeTiempo) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md p-8">
@@ -490,7 +490,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
         </div>
       </div>
     );
-  }
+  }*/
 
   return (
     <div className="h-full w-full relative">

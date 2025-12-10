@@ -15,6 +15,7 @@ export * from './OccupancyLegend';
 export * from './SimulationCompleteModal';
 export * from './SimulationControls';
 export * from './SimulationControlsFloating';
+export * from './LiveSimulationInfo';
 export * from './EventFeed';
 export * from './AnimatedFlightMarker';
 export * from './AnimatedFlightPath';
