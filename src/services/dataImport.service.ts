@@ -124,6 +124,39 @@ export async function importOrders(
     throw error;
   }
 }
+export async function importOrdersDiaDia(
+    file: File,
+    modo: string,
+    horaInicio?: string,
+    horaFin?: string,
+): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // ⚠️ CORREGIR: Enviar modo como query parameter, NO como form-data
+  const queryParams = new URLSearchParams();
+  queryParams.append('modo', modo); // ✅ Esto va en la URL
+  if (horaInicio) queryParams.append('horaInicio', horaInicio);
+  if (horaFin) queryParams.append('horaFin', horaFin);
+
+  try {
+    const response = await fetch(`${API_URL}/api/data-import/ordersDiaDia?${queryParams.toString()}`, {
+      method: 'POST',
+      body: formData, // Solo el archivo va en el body
+    });
+
+    const result: ImportResult = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Error importando pedidos');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error importando pedidos:', error);
+    throw error;
+  }
+}
 
 export async function importCancellations(file: File): Promise<ImportResult> {
   const formData = new FormData();
@@ -244,20 +277,20 @@ export interface CargaDatosResult {
 }
 
 /**
- * Importa múltiples archivos de pedidos para modo día a día
+ * Importa un archivo de pedidos para modo día a día
  * Calcula automáticamente la ventana temporal: desde ahora hasta mañana 00:00
  *
- * @param files Array de archivos de pedidos
+ * @param file Archivo de pedidos (Excel, CSV o TXT)
  * @param horaInicio Hora de inicio (ISO string) - normalmente la hora actual
  * @param horaFin Hora de fin (ISO string) - normalmente mañana a las 00:00
- * @returns Resultado de la importación batch
+ * @returns Resultado de la importación
  */
 export async function importOrdersDiaADia(
-  files: File[],
+  file: File,
   horaInicio: string,
   horaFin: string
 ): Promise<ImportResult> {
-  if (!files || files.length === 0) {
+  if (!file ) {
     return {
       success: false,
       message: 'No hay archivos de pedidos seleccionados',
@@ -267,14 +300,14 @@ export async function importOrdersDiaADia(
 
   try {
     console.log('[importOrdersDiaADia] Importando pedidos:', {
-      files: files.length,
+      file,
       horaInicio,
       horaFin,
     });
 
     // Usar importOrdersBatch con ventana temporal
-    const result = await importOrdersBatch(
-      files,
+    const result = await importOrdersDiaDia(
+      file,
       'DIARIO',
       horaInicio,
       horaFin
@@ -284,9 +317,9 @@ export async function importOrdersDiaADia(
     return {
       success: result.success,
       message: result.message,
-      orders: result.totalOrders,
-      count: result.filesProcessed,
-      error: result.errors?.join(', '),
+      orders: result.orders,
+      count: result.count,
+      error: result.error,
     };
   } catch (error) {
     console.error('[importOrdersDiaADia] Error:', error);

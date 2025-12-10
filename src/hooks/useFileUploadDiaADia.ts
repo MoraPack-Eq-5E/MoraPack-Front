@@ -6,11 +6,12 @@
  */
 
 import { useState, useCallback } from 'react';
-import { importOrdersDiaADia, type ImportResult } from '@/services/dataImport.service';
+import {importOrdersDiaADia} from '@/services/dataImport.service';
+import type { ImportResult } from '@/services/dataImport.service';
 
 export interface FileUploadStateDiaADia {
   pedidos: {
-    files: File[];
+    file: File | null;
     isUploading: boolean;
     result: ImportResult | null;
     error: string | null;
@@ -20,7 +21,7 @@ export interface FileUploadStateDiaADia {
 export function useFileUploadDiaADia() {
   const [state, setState] = useState<FileUploadStateDiaADia>({
     pedidos: {
-      files: [],
+      file: null,
       isUploading: false,
       result: null,
       error: null,
@@ -28,26 +29,26 @@ export function useFileUploadDiaADia() {
   });
 
   // Establecer archivos de pedidos
-  const setPedidosFiles = useCallback((files: File[]) => {
+  const setPedidosFiles = useCallback((file: File | null) => {
     setState((prev) => ({
       ...prev,
       pedidos: {
         ...prev.pedidos,
-        files,
+        file,
         result: null,
         error: null,
       },
     }));
   }, []);
 
-  // Subir archivos de pedidos
+  // Subir archivo de pedidos
   const uploadPedidos = useCallback(async () => {
-    if (state.pedidos.files.length === 0) {
+    if (!state.pedidos.file) {
       setState((prev) => ({
         ...prev,
         pedidos: {
           ...prev.pedidos,
-          error: 'No hay archivos de pedidos seleccionados',
+          error: 'No hay archivo de pedidos seleccionado',
         },
       }));
       return null;
@@ -69,17 +70,28 @@ export function useFileUploadDiaADia() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
 
-      const horaInicio = now.toISOString();
-      const horaFin = tomorrow.toISOString();
+      // Formatear fechas en formato LocalDateTime sin Z (yyyy-MM-ddTHH:mm:ss)
+      const formatLocalDateTime = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      };
 
-      console.log('[useFileUploadDiaADia] Cargando pedidos:', {
-        files: state.pedidos.files.length,
+      const horaInicio = formatLocalDateTime(now);
+      const horaFin = formatLocalDateTime(tomorrow);
+
+      console.log('[useFileUploadDiaADia] Cargando pedido:', {
+        filename: state.pedidos.file.name,
         horaInicio,
         horaFin,
       });
 
       const result = await importOrdersDiaADia(
-        state.pedidos.files,
+        state.pedidos.file,
         horaInicio,
         horaFin
       );
@@ -109,31 +121,18 @@ export function useFileUploadDiaADia() {
 
       return null;
     }
-  }, [state.pedidos.files]);
+  }, [state.pedidos.file]);
 
   // Limpiar todo
   const clearAll = useCallback(() => {
     setState({
       pedidos: {
-        files: [],
+        file: null,
         isUploading: false,
         result: null,
         error: null,
       },
     });
-  }, []);
-
-  // Remover archivo de pedidos por índice
-  const removePedidosFile = useCallback((index: number) => {
-    setState((prev) => ({
-      ...prev,
-      pedidos: {
-        ...prev.pedidos,
-        files: prev.pedidos.files.filter((_, i) => i !== index),
-        result: null,
-        error: null,
-      },
-    }));
   }, []);
 
   // Verificar si todos los archivos están cargados exitosamente
@@ -143,14 +142,13 @@ export function useFileUploadDiaADia() {
   const isUploading = state.pedidos.isUploading;
 
   // Obtener total de archivos
-  const totalFiles = state.pedidos.files.length;
+  const totalFiles = state.pedidos.file ? 1 : 0;
 
   return {
     state,
     setPedidosFiles,
     uploadPedidos,
     clearAll,
-    removePedidosFile,
     allUploaded,
     isUploading,
     totalFiles,

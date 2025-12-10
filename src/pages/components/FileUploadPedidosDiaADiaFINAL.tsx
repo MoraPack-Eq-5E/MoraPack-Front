@@ -18,13 +18,13 @@ interface FileUploadPedidosDiaADiaProps {
 }
 
 function FileInputCard({
-  files,
-  onFilesSelect,
+  file,
+  onFileSelect,
   onFileRemove,
 }: {
-  files: File[];
-  onFilesSelect: (files: File[]) => void;
-  onFileRemove: (index: number) => void;
+  file: File | null;
+  onFileSelect: (file: File | null) => void;
+  onFileRemove: () => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,14 +56,14 @@ function FileInputCard({
     );
 
     if (droppedFiles.length > 0) {
-      onFilesSelect([...files, ...droppedFiles]);
+      onFileSelect(droppedFiles[0]); // Solo el primer archivo
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (selectedFiles && selectedFiles.length > 0) {
-      onFilesSelect([...files, ...Array.from(selectedFiles)]);
+      onFileSelect(selectedFiles[0]); // Solo el primer archivo
     }
   };
 
@@ -76,7 +76,7 @@ function FileInputCard({
       className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
         isDragging
           ? 'border-blue-500 bg-blue-50'
-          : files.length > 0
+          : file
           ? 'border-green-500 bg-green-50'
           : 'border-gray-300 hover:border-gray-400 bg-white'
       }`}
@@ -89,7 +89,7 @@ function FileInputCard({
         <div className="flex-shrink-0">
           <svg
             className={`w-12 h-12 ${
-              files.length > 0 ? 'text-green-500' : 'text-gray-400'
+              file ? 'text-green-500' : 'text-gray-400'
             }`}
             fill="none"
             stroke="currentColor"
@@ -106,46 +106,41 @@ function FileInputCard({
 
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 mb-1">
-            📦 Archivos de Pedidos
+            📦 Archivo de Pedidos
           </h3>
           <p className="text-sm text-gray-600 mb-3">
-            Arrastra y suelta aquí tus archivos Excel, CSV o TXT de pedidos
+            Arrastra y suelta aquí tu archivo Excel, CSV o TXT de pedidos
           </p>
 
-          {files.length > 0 ? (
+          {file ? (
             <div className="space-y-2 mb-3">
               <div className="text-sm font-medium text-gray-700">
-                {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}:
+                Archivo seleccionado:
               </div>
-              {files.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between bg-white border border-gray-200 rounded px-3 py-2"
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                    <span className="text-xs text-gray-500 flex-shrink-0">
-                      ({(file.size / 1024).toFixed(1)} KB)
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => onFileRemove(index)}
-                    className="ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
-                    title="Eliminar archivo"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded px-3 py-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                  <span className="text-xs text-gray-500 flex-shrink-0">
+                    ({(file.size / 1024).toFixed(1)} KB)
+                  </span>
                 </div>
-              ))}
+                <button
+                  onClick={onFileRemove}
+                  className="ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                  title="Eliminar archivo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -153,7 +148,7 @@ function FileInputCard({
             onClick={handleClick}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
           >
-            {files.length > 0 ? 'Agregar más archivos' : 'Seleccionar archivos'}
+            {file ? 'Cambiar archivo' : 'Seleccionar archivo'}
           </button>
 
           <input
@@ -161,7 +156,6 @@ function FileInputCard({
             type="file"
             className="hidden"
             accept=".xlsx,.csv,.txt"
-            multiple
             onChange={handleFileInputChange}
           />
         </div>
@@ -178,7 +172,7 @@ export function FileUploadPedidosDiaADia({
 
   const handleCargar = async () => {
     if (upload.totalFiles === 0) {
-      toast.warning('Archivos faltantes', 'Debes seleccionar al menos un archivo de pedidos');
+      toast.warning('Archivo faltante', 'Debes seleccionar un archivo de pedidos');
       return;
     }
 
@@ -193,7 +187,7 @@ export function FileUploadPedidosDiaADia({
     } else {
       toast.error(
         '✕ Error en carga',
-        result?.message || 'Error al cargar archivos'
+        result?.message || 'Error al cargar archivo'
       );
     }
   };
@@ -201,16 +195,16 @@ export function FileUploadPedidosDiaADia({
   const handleLimpiar = () => {
     upload.clearAll();
     onClear?.();
-    toast.info('Limpiado', 'Archivos y resultados eliminados');
+    toast.info('Limpiado', 'Archivo y resultados eliminados');
   };
 
   return (
     <div className="space-y-4">
-      {/* Card de carga de archivos */}
+      {/* Card de carga de archivo */}
       <FileInputCard
-        files={upload.state.pedidos.files}
-        onFilesSelect={upload.setPedidosFiles}
-        onFileRemove={upload.removePedidosFile}
+        file={upload.state.pedidos.file}
+        onFileSelect={upload.setPedidosFiles}
+        onFileRemove={() => upload.setPedidosFiles(null)}
       />
 
       {/* Botones de acción */}
