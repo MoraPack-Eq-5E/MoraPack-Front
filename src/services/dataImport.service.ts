@@ -124,6 +124,39 @@ export async function importOrders(
     throw error;
   }
 }
+export async function importOrdersDiaDia(
+    file: File,
+    modo: string,
+    horaInicio?: string,
+    horaFin?: string,
+): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // ⚠️ CORREGIR: Enviar modo como query parameter, NO como form-data
+  const queryParams = new URLSearchParams();
+  queryParams.append('modo', modo); // ✅ Esto va en la URL
+  if (horaInicio) queryParams.append('horaInicio', horaInicio);
+  if (horaFin) queryParams.append('horaFin', horaFin);
+
+  try {
+    const response = await fetch(`${API_URL}/api/data-import/ordersDiaDia?${queryParams.toString()}`, {
+      method: 'POST',
+      body: formData, // Solo el archivo va en el body
+    });
+
+    const result: ImportResult = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Error importando pedidos');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error importando pedidos:', error);
+    throw error;
+  }
+}
 
 export async function importCancellations(file: File): Promise<ImportResult> {
   const formData = new FormData();
@@ -227,79 +260,76 @@ export async function importOrdersBatch(
 }
 
 /**
- * Resultado detallado de batch import
+ * ========================================
+ * FUNCIONES ESPECÍFICAS PARA DÍA A DÍA
+ * ========================================
  */
-export interface FileImportResult {
-  filename: string;
-  success: boolean;
-  orders?: number;
-  error?: string;
-  loaded?: number;
-  filtered?: number;
-}
 
-export interface BatchImportResult {
-  success: boolean;
-  message: string;
-  totalOrders: number;
-  filesProcessed: number;
-  totalFiles: number;
-  filesWithErrors?: number;
-  fileResults: FileImportResult[];
-  errors?: string[];
+export interface CargaDatosResult {
+  exito: boolean;
+  mensaje: string;
+  sessionId?: string;
+  estadisticas: {
+    pedidosCargados: number;
+    pedidosCreados: number;
+    duracionSegundos: number;
+  };
 }
 
 /**
- * Importa múltiples archivos de pedidos en batch
- * POST /api/data-import/orders/batch
+ * Importa un archivo de pedidos para modo día a día
+ * Calcula automáticamente la ventana temporal: desde ahora hasta mañana 00:00
  *
- * Requiere que existan aeropuertos en BD
- * Cada archivo se procesa con su propio aeropuerto de origen
- *
- * @param files Array de archivos de pedidos (_pedidos_{AIRPORT}_.txt)
- * @param horaInicio Opcional: solo cargar pedidos después de esta hora (ISO 8601)
- * @param horaFin Opcional: solo cargar pedidos antes de esta hora (ISO 8601)
- * @returns Resultado detallado del batch import con información por archivo
+ * @param file Archivo de pedidos (Excel, CSV o TXT)
+ * @param horaInicio Hora de inicio (ISO string) - normalmente la hora actual
+ * @param horaFin Hora de fin (ISO string) - normalmente mañana a las 00:00
+ * @returns Resultado de la importación
  */
-// export async function importOrdersBatch(
-//   files: File[],
-//   horaInicio?: string,
-//   horaFin?: string
-// ): Promise<BatchImportResult> {
-//   const formData = new FormData();
+export async function importOrdersDiaADia(
+  file: File,
+  horaInicio: string,
+  horaFin: string
+): Promise<ImportResult> {
+  if (!file ) {
+    return {
+      success: false,
+      message: 'No hay archivos de pedidos seleccionados',
+      error: 'Debes seleccionar al menos un archivo',
+    };
+  }
 
-//   // Añadir todos los archivos al FormData
-//   files.forEach((file) => {
-//     formData.append('files', file);
-//   });
+  try {
+    console.log('[importOrdersDiaADia] Importando pedidos:', {
+      file,
+      horaInicio,
+      horaFin,
+    });
 
-//   // Construir URL con parámetros opcionales
-//   const url = new URL(`${API_URL}/api/data-import/orders/batch`);
-//   if (horaInicio) {
-//     url.searchParams.append('horaInicio', horaInicio);
-//   }
-//   if (horaFin) {
-//     url.searchParams.append('horaFin', horaFin);
-//   }
+    // Usar importOrdersBatch con ventana temporal
+    const result = await importOrdersDiaDia(
+      file,
+      'DIARIO',
+      horaInicio,
+      horaFin
+    );
 
-//   try {
-//     const response = await fetch(url.toString(), {
-//       method: 'POST',
-//       body: formData,
-//     });
-
-//     const result: BatchImportResult = await response.json();
-
-//     if (!response.ok) {
-//       throw new Error(result.message || 'Error importando pedidos en batch');
-//     }
-
-//     return result;
-//   } catch (error) {
-//     console.error('Error importando pedidos en batch:', error);
-//     throw error;
-//   }
-// }
+    // Adaptar BatchImportResult a ImportResult
+    return {
+      success: result.success,
+      message: result.message,
+      orders: result.orders,
+      count: result.count,
+      error: result.error,
+    };
+  } catch (error) {
+    console.error('[importOrdersDiaADia] Error:', error);
+    return {
+      success: false,
+      message: 'Error importando pedidos',
+      error: error instanceof Error ? error.message : 'Error desconocido',
+    };
+  }
+}
 
 /**
  * Obtiene el estado de los endpoints de importación

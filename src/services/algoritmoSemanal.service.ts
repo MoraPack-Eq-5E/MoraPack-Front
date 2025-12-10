@@ -26,6 +26,7 @@ export interface AlgoritmoRequest {
   
   // Debug
   modoDebug?: boolean;
+  inicioOperacionDiaADia?: boolean;
 }
 
 export interface AlgoritmoResponse {

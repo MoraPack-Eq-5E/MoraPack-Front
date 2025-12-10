@@ -1,7 +1,7 @@
 /**
  * MapViewTemporal
  *
- * Versión mejorada de MapView que usa useTemporalSimulation
+ * Versión para simulación semanal - Solo visualización, sin cancelación de vuelos
  */
 
 import {useState, useMemo, useEffect} from 'react';
@@ -36,7 +36,6 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
   const [showControls, setShowControls] = useState(true);
   const [showEventFeed, setShowEventFeed] = useState(true);
-
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
   const { airports, isLoading: airportsLoading } = capacityManager;
@@ -58,7 +57,7 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
     onFlightCapacityChange: capacityManager.handleFlightCapacityEvent,
     aeropuertos: aeropuertosParaSimulacion,
   });
-  const { completedOrdersCount, totalOrdersCount, completedOrderIds, simulationEvents } = simulation;
+  const {  completedOrdersCount, totalOrdersCount, completedOrderIds, simulationEvents } = simulation;
   // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
   // Iniciamos la reproducción cuando haya timeline y autoPlay esté activado
   useEffect(() => {
@@ -72,6 +71,36 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
       onCompletedOrdersChange(completedOrderIds);
     }
   }, [completedOrderIds, onCompletedOrdersChange]);
+  // Mapa: aeropuertoId -> lista de vuelos activos relacionados
+  /*const flightsByAirport = useMemo(() => {
+    const map = new Map<number, typeof activeFlights>();
+
+    activeFlights.forEach(flight => {
+      // Contar tanto origen como destino
+      [flight.originAirportId, flight.destinationAirportId].forEach(airportId => {
+        if (airportId == null) return;
+        if (!map.has(airportId)) {
+          map.set(airportId, []);
+        }
+        map.get(airportId)!.push(flight);
+      });
+    });
+
+    return map;
+  }, [activeFlights]);
+*/
+  // Aeropuerto seleccionado (objeto completo)
+  /*const selectedAirport = useMemo(
+      () => airports.find(a => a.id === selectedAirportId) ?? null,
+      [airports, selectedAirportId]
+  );*/
+
+  // Vuelos asociados al aeropuerto seleccionado
+  /*const flightsForSelectedAirport = useMemo(
+      () => (selectedAirportId != null ? (flightsByAirport.get(selectedAirportId) ?? []) : []),
+      [selectedAirportId, flightsByAirport]
+  );*/
+
   // Envolver reset para también resetear capacidades
   const handleReset = () => {
     simulation.reset();
@@ -122,7 +151,6 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
     
     return flights;
   }, [simulation.activeFlights, airports]);
-
 
   // Culling de vuelos
   const culledFlights = useMemo(() => {
@@ -175,6 +203,8 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
             <AirportMarker
               key={airport.id}
               airport={airport}
+              //isSelected={false}
+              //onClick={() => {}}
             />
           ))}
 

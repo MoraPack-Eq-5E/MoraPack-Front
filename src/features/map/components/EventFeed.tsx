@@ -55,7 +55,15 @@ function getEventStyle(type: SimulationEvent['type']): {
         borderColor: 'border-l-teal-500',
         label: 'Aterrizaje',
       };
-    
+    case 'FLIGHT_CANCELED':
+      return {
+        icon: '🚫',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-l-red-500',
+        label: 'Vuelo Cancelado',
+      };
+
     // Eventos de pedidos
     case 'ORDER_DEPARTED':
       return {
