@@ -2,18 +2,21 @@
  * MapViewTemporal
  *
  * Versión para simulación semanal - Solo visualización, sin cancelación de vuelos
+ * Con filtrado avanzado de eventos y apertura automática de popups de aviones
  */
 
-import {useState, useMemo, useEffect} from 'react';
-import L from 'leaflet';
-import { useTemporalSimulation, useAirportCapacityManager, type TimeUnit } from '../hooks';
+import {useState, useMemo, useEffect, useRef, useCallback} from 'react';
+import L, { Marker as LeafletMarker } from 'leaflet';
+import { useTemporalSimulation, useAirportCapacityManager, useSimulationEvents, type TimeUnit } from '../hooks';
 import type { AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
+import type { EventFilter } from '@/types/simulation.types';
 import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
 import { AnimatedFlightMarker } from './AnimatedFlightMarker';
 import { RoutesLayer } from './RoutesLayer';
 import { OccupancyLegend } from './OccupancyLegend';
 import { EventFeed } from './EventFeed';
+import { OrderDetailDrawer } from './OrderDetailDrawer';
 
 interface MapViewTemporalProps {
   resultado: AlgoritmoResponse;
@@ -36,6 +39,25 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
   const [showControls, setShowControls] = useState(true);
   const [showEventFeed, setShowEventFeed] = useState(true);
+  
+  // Estado de filtros para eventos
+  const [eventFilter, setEventFilter] = useState<EventFilter>({
+    categories: ['ALL'],
+    searchTerm: '',
+  });
+
+  // Estado para el drawer de detalles de pedido
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  // Info del vuelo actual si el pedido está en vuelo
+  const [selectedOrderFlightInfo, setSelectedOrderFlightInfo] = useState<{
+    flightCode: string;
+    originCode: string;
+    destinationCode: string;
+  } | null>(null);
+
+  // Refs para marcadores de aviones (para abrir popups)
+  const markerRefsRef = useRef<Map<string, LeafletMarker>>(new Map());
+  
   // Hook de gestión de capacidades de aeropuertos
   const capacityManager = useAirportCapacityManager();
   const { airports, isLoading: airportsLoading } = capacityManager;
@@ -58,6 +80,151 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
     aeropuertos: aeropuertosParaSimulacion,
   });
   const {  completedOrdersCount, totalOrdersCount, completedOrderIds, simulationEvents } = simulation;
+  
+  // Hook para gestión de eventos con filtrado avanzado
+  const { filteredEvents } = useSimulationEvents(simulationEvents, {
+    maxEvents: 200,
+    enableFilters: true,
+  });
+
+  // Aplicar filtros del estado local a los eventos
+  const displayedEvents = useMemo(() => {
+    let events = filteredEvents;
+    
+    // Aplicar filtro por orderId
+    if (eventFilter.orderId) {
+      const orderIdNum = parseInt(eventFilter.orderId, 10);
+      events = events.filter(e => 
+        e.relatedOrderId === orderIdNum ||
+        e.relatedOrderIds?.includes(orderIdNum) ||
+        e.message.includes(eventFilter.orderId!)
+      );
+    }
+    
+    // Aplicar filtro por flightCode
+    if (eventFilter.flightCode) {
+      const flightCodeLower = eventFilter.flightCode.toLowerCase();
+      events = events.filter(e =>
+        e.relatedFlightCode?.toLowerCase().includes(flightCodeLower) ||
+        e.message.toLowerCase().includes(flightCodeLower)
+      );
+    }
+    
+    // Aplicar filtro por airportCode
+    if (eventFilter.airportCode) {
+      const airportCodeLower = eventFilter.airportCode.toLowerCase();
+      events = events.filter(e =>
+        e.relatedAirportCode?.toLowerCase() === airportCodeLower ||
+        e.message.toLowerCase().includes(airportCodeLower)
+      );
+    }
+    
+    // Aplicar filtro por categorías
+    if (!eventFilter.categories.includes('ALL')) {
+      events = events.filter(e => {
+        const type = e.type;
+        if (eventFilter.categories.includes('FLIGHT') && 
+            (type === 'FLIGHT_DEPARTURE' || type === 'FLIGHT_ARRIVAL' || type === 'FLIGHT_CANCELED')) {
+          return true;
+        }
+        if (eventFilter.categories.includes('ORDER') &&
+            (type === 'ORDER_DEPARTED' || type === 'ORDER_ARRIVED_AIRPORT' || 
+             type === 'ORDER_AT_DESTINATION' || type === 'ORDER_PICKED_UP' || type === 'ORDER_DELIVERED')) {
+          return true;
+        }
+        if (eventFilter.categories.includes('WAREHOUSE') &&
+            (type === 'WAREHOUSE_WARNING' || type === 'WAREHOUSE_CRITICAL' || type === 'WAREHOUSE_FULL')) {
+          return true;
+        }
+        if (eventFilter.categories.includes('ALERT') && type === 'SLA_RISK') {
+          return true;
+        }
+        return false;
+      });
+    }
+    
+    return events;
+  }, [filteredEvents, eventFilter]);
+
+  // Función para abrir popup de un avión por eventId
+  const openFlightPopup = useCallback((eventId: string) => {
+    const marker = markerRefsRef.current.get(eventId);
+    if (marker) {
+      console.log(`[MapViewTemporal] Abriendo popup para vuelo ${eventId}`);
+      marker.openPopup();
+    } else {
+      console.warn(`[MapViewTemporal] Marcador no encontrado para eventId: ${eventId}`);
+    }
+  }, []);
+
+  // Callback para registrar marcadores
+  const handleMarkerCreated = useCallback((eventId: string, marker: LeafletMarker) => {
+    markerRefsRef.current.set(eventId, marker);
+  }, []);
+
+  // Callback para eliminar marcadores (cuando el vuelo termina)
+  const handleMarkerRemoved = useCallback((eventId: string) => {
+    markerRefsRef.current.delete(eventId);
+  }, []);
+
+  // Preparar lista de vuelos activos para EventFeed
+  const activeFlightsForEventFeed = useMemo(() => {
+    return simulation.activeFlights.map(f => ({
+      eventId: f.eventId,
+      orderIds: f.orderIds,
+      flightCode: f.flightCode,
+    }));
+  }, [simulation.activeFlights]);
+
+  // Preparar lista de aeropuertos para filtros
+  const airportsForFilters = useMemo(() => {
+    return airports.map(a => ({
+      codigoIATA: a.codigoIATA,
+      nombre: a.ciudad || a.codigoIATA,
+    }));
+  }, [airports]);
+
+  // Handler para abrir el drawer de detalles de pedido
+  const handleOpenOrderDetail = useCallback((orderId: number) => {
+    console.log(`[MapViewTemporal] Abriendo detalles del pedido #${orderId}`);
+    
+    // Buscar si el pedido está actualmente en un vuelo activo
+    const flightWithOrder = simulation.activeFlights.find(f => f.orderIds.includes(orderId));
+    
+    if (flightWithOrder) {
+      // El pedido está en vuelo - guardar info del vuelo
+      const originAirport = airports.find(a => a.id === flightWithOrder.originAirportId);
+      const destAirport = airports.find(a => a.id === flightWithOrder.destinationAirportId);
+      
+      setSelectedOrderFlightInfo({
+        flightCode: flightWithOrder.flightCode,
+        originCode: originAirport?.codigoIATA || '???',
+        destinationCode: destAirport?.codigoIATA || '???',
+      });
+      console.log(`[MapViewTemporal] Pedido #${orderId} está en vuelo ${flightWithOrder.flightCode}`);
+    } else {
+      // El pedido no está en vuelo
+      setSelectedOrderFlightInfo(null);
+    }
+    
+    setSelectedOrderId(orderId);
+  }, [simulation.activeFlights, airports]);
+
+  // Handler para cerrar el drawer
+  const handleCloseOrderDetail = useCallback(() => {
+    setSelectedOrderId(null);
+    setSelectedOrderFlightInfo(null);
+  }, []);
+
+  // Handler para filtrar eventos por pedido desde el drawer
+  const handleFilterByOrderFromDrawer = useCallback((orderId: number) => {
+    setEventFilter(prev => ({
+      ...prev,
+      orderId: orderId.toString(),
+    }));
+    setSelectedOrderId(null); // Cerrar drawer al filtrar
+  }, []);
+
   // Auto-play si se solicita (por ejemplo EnVivoPage quiere reproducción en tiempo real)
   // Iniciamos la reproducción cuando haya timeline y autoPlay esté activado
   useEffect(() => {
@@ -232,6 +399,9 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
               key={flight.eventId}
               flight={flight}
               curvature={CURVATURE}
+              onMarkerCreated={handleMarkerCreated}
+              onMarkerRemoved={handleMarkerRemoved}
+              onOrderIdClick={handleOpenOrderDetail}
             />
           );
         })}
@@ -410,9 +580,15 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
             {showEventFeed && (
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <EventFeed 
-                  events={simulationEvents}
+                  events={displayedEvents}
                   enableSearch={true}
                   embedded={true}
+                  filter={eventFilter}
+                  onFilterChange={setEventFilter}
+                  airports={airportsForFilters}
+                  onFlightPopupRequest={openFlightPopup}
+                  activeFlights={activeFlightsForEventFeed}
+                  onOpenOrderDetail={handleOpenOrderDetail}
                 />
               </div>
             )}
@@ -422,6 +598,14 @@ export function MapViewTemporal({ resultado, initialTimeUnit, autoPlay, onComple
 
       {/* Leyenda de ocupación (bottom-left) */}
       <OccupancyLegend />
+
+      {/* Drawer de detalles de pedido */}
+      <OrderDetailDrawer
+        orderId={selectedOrderId}
+        onClose={handleCloseOrderDetail}
+        onFilterByOrder={handleFilterByOrderFromDrawer}
+        currentFlightInfo={selectedOrderFlightInfo}
+      />
     </div>
   );
 }

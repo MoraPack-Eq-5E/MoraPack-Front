@@ -17,6 +17,12 @@ import { computeControlPoint, bezierPoint, bezierTangent, bearingFromTangent, ty
 interface AnimatedFlightMarkerProps {
   flight: ActiveFlightState;
   curvature?: number;
+  /** Callback cuando el marcador se crea (para registro externo) */
+  onMarkerCreated?: (eventId: string, marker: LeafletMarker) => void;
+  /** Callback cuando el marcador se elimina */
+  onMarkerRemoved?: (eventId: string) => void;
+  /** Callback cuando se hace clic en un ID de pedido en el popup */
+  onOrderIdClick?: (orderId: number) => void;
 }
 
 /**
@@ -68,7 +74,10 @@ function createPlaneIcon(bearing: number, color: string): DivIcon {
  */
 export function AnimatedFlightMarker({
      flight,
-     curvature = 0.25
+     curvature = 0.25,
+     onMarkerCreated,
+     onMarkerRemoved,
+     onOrderIdClick,
      }: AnimatedFlightMarkerProps) {
   const map = useMap();
   const markerRef = useRef<LeafletMarker | null>(null);
@@ -153,9 +162,26 @@ export function AnimatedFlightMarker({
     const ventanaInfo = flight.windowIndex
              ? `<div>Ventana: ${flight.windowIndex}</div>`
              : '';
+    
+    // Mostrar IDs de pedidos (hasta 8, luego mostrar "+X más")
+    // Los IDs son clickeables para abrir el drawer de detalles
+    const orderIds = flight.orderIds || [];
+    const orderIdsToShow = orderIds.slice(0, 8);
+    const remainingOrders = orderIds.length - orderIdsToShow.length;
+    const orderIdsHtml = orderIds.length > 0 
+      ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+           <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;">IDs de Pedidos (clic para detalles):</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+             ${orderIdsToShow.map(id => 
+               `<button data-order-id="${id}" style="background: #eef2ff; color: #4f46e5; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: none; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#c7d2fe'" onmouseout="this.style.background='#eef2ff'">#${id}</button>`
+             ).join('')}
+             ${remainingOrders > 0 ? `<span style="font-size: 10px; color: #9ca3af;">+${remainingOrders} más</span>` : ''}
+           </div>
+         </div>`
+      : '';
 
     marker.bindPopup(`
-      <div style="min-width: 220px; font-family: system-ui, sans-serif;">
+      <div style="min-width: 240px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
           ${cleanFlightCode}
         </div>
@@ -163,17 +189,48 @@ export function AnimatedFlightMarker({
           <div>${flight.originCode} → ${flight.destinationCode}</div>
           <div>Progreso: ${progressPercent}%</div>
           <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
-          <div>Num. Pedidos: ${numPedidos}</div>
+          <div>Pedidos: ${numPedidos}</div>
           ${ventanaInfo}
         </div>
+        ${orderIdsHtml}
       </div>
     `, { offset: [0, -10] });
 
     marker.addTo(map);
     markerRef.current = marker;
 
+    // Agregar event listener para clicks en IDs de pedidos dentro del popup
+    marker.on('popupopen', () => {
+      const popupContent = marker.getPopup()?.getElement();
+      if (popupContent && onOrderIdClick) {
+        // Agregar listener para clicks en botones de pedido
+        const handleClick = (e: Event) => {
+          const target = e.target as HTMLElement;
+          const orderId = target.getAttribute('data-order-id');
+          if (orderId) {
+            onOrderIdClick(parseInt(orderId, 10));
+          }
+        };
+        popupContent.addEventListener('click', handleClick);
+        
+        // Limpiar listener cuando se cierra el popup
+        marker.once('popupclose', () => {
+          popupContent.removeEventListener('click', handleClick);
+        });
+      }
+    });
+
+    // Notificar que el marcador fue creado
+    if (onMarkerCreated && flight.eventId) {
+      onMarkerCreated(flight.eventId, marker);
+    }
+
     // Cleanup SOLO cuando el componente se desmonta
     return () => {
+      // Notificar que el marcador será eliminado
+      if (onMarkerRemoved && flight.eventId) {
+        onMarkerRemoved(flight.eventId);
+      }
       map.removeLayer(marker);
       markerRef.current = null;
     };
@@ -200,8 +257,25 @@ export function AnimatedFlightMarker({
     const ventanaInfo = flight.windowIndex
         ? `<div>Ventana: ${flight.windowIndex}</div>`
         : '';
+    
+    // Mostrar IDs de pedidos (hasta 8) - clickeables para abrir drawer
+    const orderIds = flight.orderIds || [];
+    const orderIdsToShow = orderIds.slice(0, 8);
+    const remainingOrders = orderIds.length - orderIdsToShow.length;
+    const orderIdsHtml = orderIds.length > 0 
+      ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+           <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;">IDs de Pedidos (clic para detalles):</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+             ${orderIdsToShow.map(id => 
+               `<button data-order-id="${id}" style="background: #eef2ff; color: #4f46e5; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: none; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#c7d2fe'" onmouseout="this.style.background='#eef2ff'">#${id}</button>`
+             ).join('')}
+             ${remainingOrders > 0 ? `<span style="font-size: 10px; color: #9ca3af;">+${remainingOrders} más</span>` : ''}
+           </div>
+         </div>`
+      : '';
+    
     markerRef.current.setPopupContent(`
-      <div style="min-width: 220px; font-family: system-ui, sans-serif;">
+      <div style="min-width: 240px; font-family: system-ui, sans-serif;">
         <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px;">
           ${cleanFlightCode}
         </div>
@@ -209,9 +283,10 @@ export function AnimatedFlightMarker({
           <div>${flight.originCode} → ${flight.destinationCode}</div>
           <div>Progreso: ${progressPercent}%</div>
           <div>Capacidad: ${capacityUsed}/${capacityMax} productos</div>
-          <div>Num. Pedidos: ${numPedidos}</div>
+          <div>Pedidos: ${numPedidos}</div>
           ${ventanaInfo}
         </div>
+        ${orderIdsHtml}
       </div>
     `);
   }, [currentState, color, flight]);

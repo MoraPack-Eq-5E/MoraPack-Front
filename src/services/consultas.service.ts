@@ -236,3 +236,186 @@ export async function consultarEstadisticasAsignacion(): Promise<any> {
   return response.json();
 }
 
+// ==================== TRACKING DE PEDIDOS ====================
+
+/**
+ * Respuesta del endpoint de tracking de pedido
+ */
+export interface OrderTrackingResponse {
+  exito: boolean;
+  mensaje?: string;
+  orderId: number;
+  currentStatus: 'EN_ALMACEN' | 'EN_VUELO' | 'ENTREGADO' | 'EN_TRANSITO' | 'SIN_PRODUCTOS';
+  isInFlight: boolean;
+  currentFlightInfo?: {
+    flightId: number;
+    flightCode: string;
+    eventId: string;
+    originCode: string;
+    destinationCode: string;
+  } | null;
+  pedido: {
+    id: number;
+    fechaPedido: string | null;
+    fechaLimiteEntrega: string | null;
+    estado: string | null;
+    origenIATA: string | null;
+    destinoIATA: string | null;
+  };
+  cantidadProductos: number;
+  productos: Array<{
+    id: number;
+    nombre: string;
+    estado: string;
+    instanciaVuelo: string | null;
+    fechaLlegada: string | null;
+  }>;
+  productosEntregados: number;
+  porcentajeEntrega: number;
+}
+
+/**
+ * GET /api/consultas/pedidos/{id}/tracking
+ * Obtiene información de tracking detallada de un pedido.
+ * Incluye estado actual, información del vuelo si está en tránsito, y ubicación de productos.
+ * 
+ * @param pedidoId ID del pedido a consultar
+ * @returns Información completa de tracking del pedido
+ */
+export async function getOrderTracking(
+  pedidoId: number
+): Promise<OrderTrackingResponse> {
+  const response = await fetch(`${API_BASE}/api/consultas/pedidos/${pedidoId}/tracking`);
+
+  if (response.status === 404) {
+    // Pedido no encontrado - retornar respuesta de error controlada
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      exito: false,
+      mensaje: errorData.mensaje || `Pedido no encontrado: ${pedidoId}`,
+      orderId: pedidoId,
+      currentStatus: 'SIN_PRODUCTOS',
+      isInFlight: false,
+      currentFlightInfo: null,
+      pedido: {
+        id: pedidoId,
+        fechaPedido: null,
+        fechaLimiteEntrega: null,
+        estado: null,
+        origenIATA: null,
+        destinoIATA: null,
+      },
+      cantidadProductos: 0,
+      productos: [],
+      productosEntregados: 0,
+      porcentajeEntrega: 0,
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Error al consultar tracking del pedido ${pedidoId}: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// ==================== DETALLE COMPLETO DE PEDIDO ====================
+
+/**
+ * Respuesta del endpoint de detalle completo de pedido
+ */
+export interface OrderDetailResponse {
+  exito: boolean;
+  mensaje?: string;
+  pedido: {
+    id: number;
+    externalId: string | null;
+    nombre: string | null;
+    estado: string;
+    prioridad: number;
+    origenIATA: string | null;
+    destinoIATA: string | null;
+    fechaPedido: string | null;
+    fechaLimiteEntrega: string | null;
+    horasRecogida: number | null;
+    cantidadProductos: number;
+  };
+  cliente: {
+    nombreCompleto: string;
+    tipoDocumento: string | null;
+    numeroDocumento: string | null;
+    correo: string | null;
+    telefono: string | null;
+    ciudadRecojo: string | null;
+  } | null;
+  productos: Array<{
+    id: number;
+    nombre: string;
+    peso: number;
+    volumen: number;
+    estado: string;
+    instanciaVuelo: string | null;
+    fechaLlegada: string | null;
+  }>;
+  metricas: {
+    tiempoRestanteMinutos: number;
+    esUrgente: boolean;
+    porcentajeEntrega: number;
+    productosEntregados: number;
+    productosEnVuelo: number;
+    productosEnAlmacen: number;
+  };
+}
+
+/**
+ * GET /api/consultas/pedidos/{id}/detalle-completo
+ * Obtiene información completa de un pedido para el panel de operadores.
+ * Incluye datos del cliente, productos con estado, y métricas de urgencia.
+ * 
+ * @param pedidoId ID del pedido a consultar
+ * @returns Información completa del pedido
+ */
+export async function getOrderDetailComplete(
+  pedidoId: number
+): Promise<OrderDetailResponse> {
+  const response = await fetch(`${API_BASE}/api/consultas/pedidos/${pedidoId}/detalle-completo`);
+
+  if (response.status === 404) {
+    // Pedido no encontrado
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      exito: false,
+      mensaje: errorData.mensaje || `Pedido no encontrado: ${pedidoId}`,
+      pedido: {
+        id: pedidoId,
+        externalId: null,
+        nombre: null,
+        estado: 'DESCONOCIDO',
+        prioridad: 0,
+        origenIATA: null,
+        destinoIATA: null,
+        fechaPedido: null,
+        fechaLimiteEntrega: null,
+        horasRecogida: null,
+        cantidadProductos: 0,
+      },
+      cliente: null,
+      productos: [],
+      metricas: {
+        tiempoRestanteMinutos: 0,
+        esUrgente: false,
+        porcentajeEntrega: 0,
+        productosEntregados: 0,
+        productosEnVuelo: 0,
+        productosEnAlmacen: 0,
+      },
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Error al consultar detalle del pedido ${pedidoId}: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+

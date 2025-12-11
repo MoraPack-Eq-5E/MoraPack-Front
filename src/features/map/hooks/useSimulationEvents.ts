@@ -136,14 +136,62 @@ export function useSimulationEvents(
       });
     }
 
-    // Filtrar por búsqueda de texto
+    // Filtrar por búsqueda de texto general
     if (filter.searchTerm && filter.searchTerm.trim() !== '') {
       const searchLower = filter.searchTerm.toLowerCase();
       filtered = filtered.filter((event) =>
         event.message.toLowerCase().includes(searchLower) ||
         event.relatedAirportCode?.toLowerCase().includes(searchLower) ||
-        event.relatedFlightId?.toString().includes(searchLower)
+        event.relatedFlightId?.toString().includes(searchLower) ||
+        event.relatedFlightCode?.toLowerCase().includes(searchLower) ||
+        event.relatedOrderId?.toString().includes(searchLower) ||
+        event.relatedOrderIds?.some(id => id.toString().includes(searchLower))
       );
+    }
+
+    // Filtrar por ID de pedido específico
+    if (filter.orderId && filter.orderId.trim() !== '') {
+      const orderIdNum = parseInt(filter.orderId, 10);
+      filtered = filtered.filter((event) => {
+        // Verificar si el evento está relacionado con este pedido
+        if (event.relatedOrderId === orderIdNum) return true;
+        if (event.relatedOrderIds?.includes(orderIdNum)) return true;
+        // También buscar en el mensaje por si el ID aparece ahí
+        if (event.message.includes(filter.orderId!)) return true;
+        return false;
+      });
+    }
+
+    // Filtrar por código de vuelo
+    if (filter.flightCode && filter.flightCode.trim() !== '') {
+      const flightCodeLower = filter.flightCode.toLowerCase();
+      filtered = filtered.filter((event) => {
+        if (event.relatedFlightCode?.toLowerCase().includes(flightCodeLower)) return true;
+        if (event.message.toLowerCase().includes(flightCodeLower)) return true;
+        return false;
+      });
+    }
+
+    // Filtrar por código de aeropuerto
+    if (filter.airportCode && filter.airportCode.trim() !== '') {
+      const airportCodeLower = filter.airportCode.toLowerCase();
+      filtered = filtered.filter((event) => {
+        if (event.relatedAirportCode?.toLowerCase() === airportCodeLower) return true;
+        // También buscar en el mensaje
+        if (event.message.toLowerCase().includes(airportCodeLower)) return true;
+        return false;
+      });
+    }
+
+    // Filtrar por rango de fechas (tiempo simulado)
+    if (filter.dateRange) {
+      const { start, end } = filter.dateRange;
+      filtered = filtered.filter((event) => {
+        const eventTime = new Date(event.simulatedTime);
+        if (start && eventTime < start) return false;
+        if (end && eventTime > end) return false;
+        return true;
+      });
     }
 
     return filtered;
