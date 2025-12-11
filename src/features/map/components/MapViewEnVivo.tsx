@@ -9,6 +9,7 @@ import {useState, useMemo, useEffect} from 'react';
 import L from 'leaflet';
 import { useTemporalSimulation, useAirportCapacityManager, type TimeUnit } from '../hooks';
 import type { AlgoritmoResponse, EventoLineaDeTiempoVueloDTO } from '@/services/algoritmoSemanal.service';
+import type { SimulationEventType } from '@/types/simulation.types';
 import { MapCanvas } from './MapCanvas';
 import { AirportMarker } from './AirportMarker';
 import { AnimatedFlightMarker } from './AnimatedFlightMarker';
@@ -34,6 +35,16 @@ interface MapViewEnVivoProps {
   currentRealTime?: Date;
   // Opcional: tiempo de la siguiente ventana para reoptimización (usado en En Vivo)
   nextWindowTime?: Date;
+  // Opcional: callback para exponer la función de agregar eventos al feed
+  onSimulationEventAdd?: (addEventFn: (type: SimulationEventType, message: string, simulatedTime: Date, details?: {
+    flightId?: number;
+    flightCode?: string;
+    orderId?: number;
+    orderIds?: number[];
+    airportCode?: string;
+    airportName?: string;
+    productCount?: number;
+  }) => void) => void;
 }
 
 // Constantes
@@ -44,7 +55,7 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
   return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
 }
 
-export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange, currentRealTime, nextWindowTime}: MapViewEnVivoProps) {
+export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange, currentRealTime, nextWindowTime, onSimulationEventAdd}: MapViewEnVivoProps) {
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
   const [showControls, setShowControls] = useState(true);
   const [showEventFeed, setShowEventFeed] = useState(true);
@@ -60,6 +71,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
   const [flightProductReductions, setFlightProductReductions] = useState<Map<string, number>>(new Map());
 
   // Mapear aeropuertos al formato que espera useTemporalSimulation
+  // IMPORTANTE: Calcular capacidad inicial considerando productos en vuelos programados
   const aeropuertosParaSimulacion = useMemo(() => {
     return airports.map(a => ({
       id: a.id,
@@ -86,11 +98,19 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay, resultado.lineaDeTiempo]);
+
   useEffect(() => {
     if (onCompletedOrdersChange) {
       onCompletedOrdersChange(completedOrderIds);
     }
   }, [completedOrderIds, onCompletedOrdersChange]);
+
+  // Exponer la función addSimulationEvent al componente padre
+  useEffect(() => {
+    if (onSimulationEventAdd) {
+      onSimulationEventAdd(addSimulationEvent);
+    }
+  }, [onSimulationEventAdd, addSimulationEvent]);
 
   // Envolver reset para también resetear capacidades y estados de cancelación
   /*const handleReset = () => {
@@ -548,13 +568,14 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
       </MapCanvas>
       {/* Panel de vuelos desde aeropuerto seleccionado */}
       {selectedAirportId != null && (
-          <div className="absolute left-6 top-80 z-[900]
-            w-64 max-h-56
+          <div className="absolute left-6 top-50 z-[900]
+            w-64
             bg-white/95 backdrop-blur-sm
             rounded-xl p-3
             border border-gray-200 shadow-xl
-            pointer-events-auto text-gray-700">
-            <div className="flex items-center justify-between mb-2">
+            pointer-events-auto text-gray-700
+            flex flex-col max-h-[400px]">
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
               <h3 className="text-xs font-semibold tracking-wide text-gray-900">
                 Vuelos saliendo del aeropuerto seleccionado
               </h3>
@@ -571,7 +592,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                   No hay vuelos futuros desde este aeropuerto en la simulación.
                 </p>
             ) : (
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(2 * 140px)' }}>
                   {flightsFromSelectedAirport.map(f => {
                     const instanciaId = buildInstanciaIdFromFlight(
                         f.flightId,
@@ -744,7 +765,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                 </div>*/}
 
                 {/* Selector de velocidad */}
-                <div className="mb-3">
+                {/*<div className="mb-3">
                   <div className="text-xs text-gray-500 mb-1.5 font-medium">
                     Velocidad: 1 segundo real =
                   </div>
@@ -768,7 +789,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                       </button>
                     ))}
                   </div>
-                </div>
+                </div>*/}
 
                 {/* Estadísticas */}
                 <div className="text-xs space-y-1.5 pt-3 border-t border-gray-200">

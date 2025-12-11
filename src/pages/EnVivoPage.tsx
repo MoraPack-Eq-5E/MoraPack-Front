@@ -83,6 +83,18 @@ export function EnVivoPage() {
   const [pedidoError, setPedidoError] = useState<string | null>(null);
   const [ultimoPedidoId, setUltimoPedidoId] = useState<number | null>(null);
 
+  // Referencia a la función addSimulationEvent del mapa
+  type SimulationEventType = 'FLIGHT_DEPARTURE' | 'FLIGHT_ARRIVAL' | 'FLIGHT_CANCELED' | 'ORDER_DEPARTED' | 'ORDER_CREATED' | 'ORDER_ARRIVED_AIRPORT' | 'ORDER_AT_DESTINATION' | 'ORDER_PICKED_UP' | 'ORDER_DELIVERED' | 'WAREHOUSE_WARNING' | 'WAREHOUSE_CRITICAL' | 'WAREHOUSE_FULL' | 'SLA_RISK' | 'INFO';
+  const addSimulationEventRef = useRef<((type: SimulationEventType, message: string, simulatedTime: Date, details?: {
+    flightId?: number;
+    flightCode?: string;
+    orderId?: number;
+    orderIds?: number[];
+    airportCode?: string;
+    airportName?: string;
+    productCount?: number;
+  }) => void) | null>(null);
+
   // Actualizar horaActual cada segundo para reflejar tiempo real
   useEffect(() => {
     const interval = setInterval(() => {
@@ -396,6 +408,22 @@ export function EnVivoPage() {
       setDestinoCodigo('');
       setCantidadProductos('');
 
+      // Agregar evento al feed de eventos en tiempo real
+      if (addSimulationEventRef.current) {
+        // Usar la hora actual real al momento del registro, no la hora de la siguiente ventana
+        const eventoTiempo = new Date(horaActual);
+        addSimulationEventRef.current(
+          'ORDER_CREATED',
+          `Pedido #${nuevoId} registrado manualmente - Destino: ${destinoCodigo.trim().toUpperCase()} (${cantidad} productos)`,
+          eventoTiempo,
+          {
+            orderId: nuevoId,
+            airportCode: destinoCodigo.trim().toUpperCase(),
+            productCount: cantidad,
+          }
+        );
+      }
+
       // Notificación bonita
       toast.success(
           '¡Pedido creado exitosamente!',
@@ -441,6 +469,9 @@ export function EnVivoPage() {
                     onCompletedOrdersChange={setCompletedOrderIds}
                     currentRealTime={new Date(horaActual)}
                     nextWindowTime={nextWindowTime}
+                    onSimulationEventAdd={(addEventFn) => {
+                      addSimulationEventRef.current = addEventFn;
+                    }}
                 />
             )}
           </div>
