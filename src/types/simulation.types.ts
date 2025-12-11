@@ -91,11 +91,12 @@ export interface SimulationMetrics {
  * - SLA_RISK: Riesgo de incumplimiento de SLA
  * - INFO: Información general
  */
-export type SimulationEventType = 
+export type SimulationEventType =
   | 'FLIGHT_DEPARTURE' 
   | 'FLIGHT_ARRIVAL' 
   | 'FLIGHT_CANCELED'
   | 'ORDER_DEPARTED'
+  | 'ORDER_CREATED'
   | 'ORDER_ARRIVED_AIRPORT'
   | 'ORDER_AT_DESTINATION'
   | 'ORDER_PICKED_UP'
@@ -348,4 +349,3 @@ export interface OrderDetailResponse {
   productos: OrderDetailProducto[];
   metricas: OrderDetailMetricas;
 }
-

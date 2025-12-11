@@ -90,6 +90,14 @@ function getEventStyle(type: SimulationEvent['type']): {
         borderColor: 'border-l-indigo-500',
         label: 'Pedido en vuelo',
       };
+    case 'ORDER_CREATED':
+      return {
+        icon: '📝',
+        bgColor: 'bg-blue-50',
+        textColor: 'text-blue-700',
+        borderColor: 'border-l-blue-500',
+        label: 'Pedido registrado',
+      };
     case 'ORDER_ARRIVED_AIRPORT':
       return {
         icon: '📍',
@@ -609,4 +617,3 @@ export function EventFeed({
     </div>
   );
 }
-
