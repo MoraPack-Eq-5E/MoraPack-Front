@@ -18,11 +18,19 @@ export interface ResultadoCancelacionDTO {
 
 export async function cancelarInstanciaVuelo(
     idInstancia: string,
-    tiempoSimulacionActual: Date
+    tiempoSimulacionActual: Date,
+    tiempoSiguienteVentana?: Date
 ): Promise<ResultadoCancelacionDTO> {
     const params = new URLSearchParams({
         tiempoSimulacionActual: tiempoSimulacionActual.toISOString(),
     });
+
+    // Si se proporciona el tiempo de la siguiente ventana, agregarlo a los parámetros
+    if (tiempoSiguienteVentana) {
+        const HORAS_PERU = 5;
+        const adjusted = new Date(tiempoSiguienteVentana.getTime() - HORAS_PERU * 60 * 60 * 1000);
+        params.append('tiempoSiguienteVentana', adjusted.toISOString());
+    }
 
     const response = await fetch(
         `${API_URL}/api/vuelos/instancias/${encodeURIComponent(idInstancia)}/cancelar-y-reasignar?${params.toString()}`,

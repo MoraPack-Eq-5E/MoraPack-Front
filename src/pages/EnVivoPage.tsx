@@ -69,7 +69,7 @@ export function EnVivoPage() {
 
   // modo automático
   const [autoRun, setAutoRun] = useState(false);
-  const [intervaloMs, setIntervalMs] = useState(3600000); // 1 hora = 3600000 ms
+  const [intervaloMs] = useState(3600000); // 1 hora = 3600000 ms (setter no utilizado por ahora)
   const autoRunRef = useRef(false);
   autoRunRef.current = autoRun;
   const { isLoading: airportsLoading, refetch: refetchAirports } =
@@ -99,6 +99,16 @@ export function EnVivoPage() {
     d.setHours(d.getHours() + hours);
     return toLocalIsoNoZ(d);
   }
+
+  // Calcular el tiempo de la siguiente ventana (igual que en handleSubmitNuevoPedido)
+  const nextWindowTime = useMemo(() => {
+    const horaSiguienteVentana = ventanas.length > 0
+      ? ventanas[ventanas.length - 1].horaFin
+      : horaActual;
+    const fecha = new Date(horaSiguienteVentana);
+    fecha.setMinutes(fecha.getMinutes() + 2);
+    return fecha;
+  }, [ventanas, horaActual]);
 
   function extraerPedidosDesdeResultado(resultado: AlgoritmoResponse): PedidoVentana[] {
     const mapa = new Map<number, string>();
@@ -430,6 +440,7 @@ export function EnVivoPage() {
                     autoPlay={!!resultadoGlobalParaMapa} // solo autoPlay cuando ya hay timeline
                     onCompletedOrdersChange={setCompletedOrderIds}
                     currentRealTime={new Date(horaActual)}
+                    nextWindowTime={nextWindowTime}
                 />
             )}
           </div>
@@ -469,7 +480,7 @@ export function EnVivoPage() {
           )}
 
           {/* Panel Automático - flotante arriba a la izquierda */}
-          {archivosValidados && (
+          {/*{archivosValidados && (
               <div className="absolute top-6 left-6 z-[1100] bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl px-4 py-2.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -491,17 +502,19 @@ export function EnVivoPage() {
                   )}
                 </label>
               </div>
-          )}
+          )}*/}
 
-          {/* Botón Registrar Pedido flotante en la esquina superior derecha */}
+          {/* Botón Registrar Pedido flotante movido a la esquina superior izquierda (donde estaba el automático) */}
           {archivosValidados && (
-              <button
-                  type="button"
-                  onClick={() => setShowNewOrderPanel(true)}
-                  className="absolute top-6 right-6 z-[1100] px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-xl"
-              >
-                + Registrar pedido
-              </button>
+              <div className="absolute top-6 left-6 z-[1100]">
+                <button
+                    type="button"
+                    onClick={() => setShowNewOrderPanel(true)}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-xl"
+                >
+                  + Registrar pedido
+                </button>
+              </div>
           )}
 
           {/* Modal de carga de archivos */}
@@ -568,10 +581,10 @@ export function EnVivoPage() {
 
           {/* Panel flotante para registrar pedidos manuales */}
           {showNewOrderPanel && (
-              <div className="absolute right-6 top-20 z-[1200] w-80 bg-white border border-gray-200 shadow-2xl rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
+              <div className="absolute left-6 top-20 z-[1200] w-64 bg-white border border-gray-200 shadow-2xl rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
                   <h2 className="font-semibold text-gray-900 text-sm">
-                    Registrar pedido (operación diaria)
+                    Registrar pedido
                   </h2>
                   <button
                       type="button"
@@ -582,23 +595,23 @@ export function EnVivoPage() {
                   </button>
                 </div>
 
-                <form className="space-y-3" onSubmit={handleSubmitNuevoPedido}>
+                <form className="space-y-2" onSubmit={handleSubmitNuevoPedido}>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <label className="block text-[11px] font-medium text-gray-700 mb-1">
                       Código aeropuerto destino
                     </label>
                     <input
                         type="text"
                         value={destinoCodigo}
                         onChange={(e) => setDestinoCodigo(e.target.value)}
-                        placeholder="Ej: LIM, CUZ"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Ej: EDDI, LATI"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         disabled={isSavingPedido}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <label className="block text-[11px] font-medium text-gray-700 mb-1">
                       Cantidad de productos
                     </label>
                     <input
@@ -607,7 +620,7 @@ export function EnVivoPage() {
                         onChange={(e) => setCantidadProductos(e.target.value === '' ? '' : Number(e.target.value))}
                         placeholder="Ej: 10"
                         min={1}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         disabled={isSavingPedido}
                     />
                   </div>
@@ -618,18 +631,18 @@ export function EnVivoPage() {
                       </div>
                   )}
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-1">
                     <button
                         type="button"
                         onClick={() => setShowNewOrderPanel(false)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                         disabled={isSavingPedido}
                     >
                       Cancelar
                     </button>
                     <button
                         type="submit"
-                        className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-2 py-1 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={isSavingPedido}
                     >
                       {isSavingPedido ? 'Guardando...' : 'Guardar'}
@@ -638,18 +651,18 @@ export function EnVivoPage() {
                 </form>
 
                 {ultimoPedidoId && (
-                    <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-700">
-                      ✅ Último pedido creado: #{ultimoPedidoId}
+                    <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-700">
+                      ✅ Último pedido: #{ultimoPedidoId}
                     </div>
                 )}
               </div>
           )}
 
-          {/* Panel con info por ventana - posicionado abajo a la izquierda */}
+          {/* Panel con info por bloques de entrega - posicionado abajo a la izquierda */}
           {ventanas.length > 0 && (
               <div className="absolute bottom-6 left-6 z-[1100] w-80 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl p-3 max-h-[40vh] overflow-y-auto">
                 <h3 className="font-semibold mb-2 text-sm">
-                  Ventanas procesadas ({ventanas.length})
+                  Bloques de entrega procesados ({ventanas.length})
                 </h3>
                 {ventanas.map((v) => {
                   const totalPedidosVentana = v.orderIds.length;
@@ -667,7 +680,7 @@ export function EnVivoPage() {
                           className="mb-3 rounded-lg border px-2 py-1 text-xs bg-gray-50"
                       >
                         <div className="flex justify-between items-center">
-                          <div className="font-semibold">Ventana {v.index}</div>
+                          <div className="font-semibold">Bloque de entrega {v.index}</div>
                           <div>
                             {allDelivered ? '✅' : '⌛'}
                           </div>

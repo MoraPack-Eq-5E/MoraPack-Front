@@ -1,6 +1,6 @@
-import { memo } from 'react';
-import { Marker, Popup } from 'react-leaflet';
-import { DivIcon } from 'leaflet';
+import { memo, useEffect, useRef } from 'react';
+import { Marker, Popup, useMap } from 'react-leaflet';
+import L, { DivIcon } from 'leaflet';
 import type { Aeropuerto } from '@/types/map.types';
 
 /**
@@ -58,10 +58,12 @@ function airportIcon(isActive: boolean, isSelected: boolean, isPrincipal: boolea
 interface AirportMarkerProps {
     airport: Aeropuerto;
     onClick?: (airport: Aeropuerto) => void;
+    // Se llama cuando el Popup/infowindow se cierra (por la X o programación)
+    onClose?: (airport: Aeropuerto) => void;
     isSelected?: boolean;
 }
 
-export const AirportMarker = memo(function AirportMarker({ airport, onClick, isSelected = false }: AirportMarkerProps) {
+export const AirportMarker = memo(function AirportMarker({ airport, onClick, isSelected = false, onClose }: AirportMarkerProps) {
     const isActive = airport.estado === 'DISPONIBLE';
     const isPrincipal = airport.isPrincipal ?? false;
     
@@ -71,6 +73,30 @@ export const AirportMarker = memo(function AirportMarker({ airport, onClick, isS
         }
     };
     
+    const handlePopupClose = () => {
+        if (onClose) onClose(airport);
+    };
+
+    // Control programático del popup según `isSelected`
+    const popupRef = useRef<L.Popup | null>(null);
+    const map = useMap();
+
+    useEffect(() => {
+        if (!popupRef.current || !map) return;
+
+        try {
+            if (isSelected) {
+                // Abrir popup en el mapa
+                popupRef.current.openOn(map);
+            } else {
+                // Cerrar popup si está abierto
+                map.closePopup(popupRef.current);
+            }
+        } catch {
+            // ignore errors en runtime
+        }
+    }, [isSelected, map]);
+
     // Aeropuertos principales tienen mayor z-index para estar siempre visibles
     const zIndexOffset = isPrincipal ? 1500 : (isSelected ? 2000 : 0);
     
@@ -100,7 +126,7 @@ export const AirportMarker = memo(function AirportMarker({ airport, onClick, isS
             interactive={true}
             bubblingMouseEvents={false}
         >
-            <Popup offset={[0, -10]}>
+            <Popup ref={popupRef} offset={[0, -10]} eventHandlers={{ remove: handlePopupClose }}>
                 <div style={{minWidth: '220px', fontFamily: 'system-ui, sans-serif'}}>
                     {/* Header con ciudad - país en negrita */}
                     <div style={{fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px', borderBottom: '2px solid #e5e7eb', paddingBottom: '6px'}}>
@@ -123,6 +149,6 @@ export const AirportMarker = memo(function AirportMarker({ airport, onClick, isS
                     </div>
                 </div>
             </Popup>
-        </Marker>
-    );
-});
+         </Marker>
+     );
+ });

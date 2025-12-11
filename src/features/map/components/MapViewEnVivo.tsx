@@ -32,6 +32,8 @@ interface MapViewEnVivoProps {
   // Opcional: tiempo real actual para cancelación de vuelos (usado en En Vivo)
   // Si no se proporciona, usa currentSimDateTime del reproductor
   currentRealTime?: Date;
+  // Opcional: tiempo de la siguiente ventana para reoptimización (usado en En Vivo)
+  nextWindowTime?: Date;
 }
 
 // Constantes
@@ -42,7 +44,7 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
   return typeof coord === 'number' && !isNaN(coord) && isFinite(coord);
 }
 
-export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange, currentRealTime}: MapViewEnVivoProps) {
+export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange, currentRealTime, nextWindowTime}: MapViewEnVivoProps) {
   const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
   const [showControls, setShowControls] = useState(true);
   const [showEventFeed, setShowEventFeed] = useState(true);
@@ -91,12 +93,12 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
   }, [completedOrderIds, onCompletedOrdersChange]);
 
   // Envolver reset para también resetear capacidades y estados de cancelación
-  const handleReset = () => {
+  /*const handleReset = () => {
     simulation.reset();
     capacityManager.resetCapacities();
     setCanceledFlightInstances(new Set());
     setFlightProductReductions(new Map());
-  };
+  };*/
   async function handleCancelarVuelo(flight: (typeof flightsForRender)[number]) {
     try {
       setCancelingFlightKey(flight.eventId);
@@ -118,7 +120,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
 
         // Para el evento visual, usamos currentRealTime directamente
         // porque formatTimestamp usa getHours() que interpreta en zona local
-        tiempoParaEvento = new Date(Date.now() - HORAS_PERU * 60 * 60 * 1000);
+        tiempoParaEvento = new Date(Date.now());
       } else {
         // Modo simulación normal: usar tiempo del reproductor
         tiempoParaCancelar = simulation.currentSimDateTime;
@@ -137,7 +139,8 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
 
       const result = await cancelarInstanciaVuelo(
           instanciaId,
-          tiempoParaCancelar
+          tiempoParaCancelar,
+          nextWindowTime
       );
 
       if (!result.exitoso) {
@@ -214,13 +217,13 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
         }
       );
 
-      // 4) Mostrar mensaje de éxito
-      alert(
-          `✅ Vuelo cancelado exitosamente.\n\n` +
-          `📦 Productos afectados: ${result.productosAfectados}\n` +
-          `📋 Pedidos afectados: ${result.pedidosAfectados}\n` +
-          `✈️ Vuelo: ${result.origen} → ${result.destino}`
-      );
+      // 4) Mostrar mensaje de éxito (se removió la alerta modal para no interrumpir al usuario)
+      console.info('[CANCELAR] Vuelo cancelado (no se muestra alerta modal).', {
+        productosAfectados: result.productosAfectados,
+        pedidosAfectados: result.pedidosAfectados,
+        origen: result.origen,
+        destino: result.destino,
+      });
 
       // 5) Si requiere reoptimización, informar al usuario
       if (result.requiereReoptimizacion) {
@@ -508,6 +511,10 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
               airport={airport}
               isSelected={selectedAirportId === airport.id}
               onClick={() => setSelectedAirportId(airport.id)}
+              onClose={() => {
+                // Si se cierra el popup del aeropuerto, limpiar la selección
+                setSelectedAirportId(null);
+             }}
             />
           ))}
 
@@ -541,30 +548,30 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
       </MapCanvas>
       {/* Panel de vuelos desde aeropuerto seleccionado */}
       {selectedAirportId != null && (
-          <div className="absolute top-16 left-3 z-[900]
-            w-80 max-h-64
-            bg-slate-900/85 backdrop-blur-sm
+          <div className="absolute left-6 top-80 z-[900]
+            w-64 max-h-56
+            bg-white/95 backdrop-blur-sm
             rounded-xl p-3
-            border border-slate-700 shadow-xl
-            pointer-events-auto">
+            border border-gray-200 shadow-xl
+            pointer-events-auto text-gray-700">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold tracking-wide text-slate-200">
+              <h3 className="text-xs font-semibold tracking-wide text-gray-900">
                 Vuelos saliendo del aeropuerto seleccionado
               </h3>
               <button
-                  className="text-[10px] text-slate-400 hover:text-slate-200"
+                  className="text-[10px] text-gray-500 hover:text-gray-700"
                   onClick={() => setSelectedAirportId(null)}
               >
-                cerrar
+                Cerrar
               </button>
             </div>
 
             {flightsFromSelectedAirport.length === 0 ? (
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-gray-600">
                   No hay vuelos futuros desde este aeropuerto en la simulación.
                 </p>
             ) : (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                   {flightsFromSelectedAirport.map(f => {
                     const instanciaId = buildInstanciaIdFromFlight(
                         f.flightId,
@@ -573,14 +580,14 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                     return (
                         <div
                             key={f.eventId}
-                            className="bg-slate-900/60 border border-slate-700/80 rounded-lg px-2 py-2 flex flex-col gap-1"
+                            className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 flex flex-col gap-1"
                         >
                           <div className="flex items-center justify-between">
                             <div className="text-[11px]">
-                              <div className="font-semibold text-slate-100">
+                              <div className="font-semibold text-gray-900">
                                 {f.flightCode ?? `Vuelo ${f.flightId}`}
                               </div>
-                              <div className="text-slate-400 text-[10px]">
+                              <div className="text-gray-600 text-[10px]">
                                 {f.originCode} → {f.destinationCode}
                               </div>
                             </div>
@@ -595,7 +602,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                             </button>
                           </div>
 
-                          <div className="flex justify-between text-[10px] text-slate-400">
+                          <div className="flex justify-between text-[10px] text-gray-600">
                   <span>
                     Sale:{' '}
                     {f.departureTime.toLocaleTimeString('es-PE', {
@@ -613,7 +620,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                   </span>
                           </div>
 
-                          <div className="flex justify-between text-[10px] text-slate-400">
+                          <div className="flex justify-between text-[10px] text-gray-600">
                             <span>
                     Pedidos:{' '}
                               {f.orderIds && f.orderIds.length > 0
@@ -623,8 +630,8 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                           </div>
 
                           {f.orderIds && f.orderIds.length > 0 && (
-                              <div className="mt-1 text-[10px] text-slate-500">
-                    <span className="font-medium text-slate-300">
+                              <div className="mt-1 text-[10px] text-gray-700">
+                    <span className="font-medium text-gray-900">
                       IDs de pedidos:
                     </span>{' '}
                                 {f.orderIds.slice(0, 5).join(', ')}
@@ -632,8 +639,8 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                               </div>
                           )}
 
-                          <div className="mt-1 text-[9px] text-slate-500">
-                            Instancia: <code>{instanciaId}</code>
+                          <div className="mt-1 text-[9px] text-gray-500">
+                            Instancia: <code className="text-xs text-gray-600">{instanciaId}</code>
                           </div>
                         </div>
                     );
@@ -659,7 +666,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <h3 className="text-sm font-semibold text-white">Reproductor</h3>
+                  {/*<h3 className="text-sm font-semibold text-white">Reproductor</h3>*/}
                   {/* Mini indicador de estado cuando está colapsado */}
                   {!showControls && (
                     <span className="text-[10px] text-white/80 font-mono">
@@ -687,7 +694,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
             <div className={`overflow-hidden transition-all duration-300 ${showControls ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
               <div className="p-3">
                 {/* Botones Play/Pause/Reset */}
-                <div className="flex gap-2 mb-3">
+                {/*<div className="flex gap-2 mb-3">
                   {!simulation.isPlaying ? (
                     <button
                       onClick={simulation.play}
@@ -704,7 +711,7 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                       className="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
                     >
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 002 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
                       Pausar
                     </button>
@@ -719,15 +726,22 @@ export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onComplete
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </button>
+                </div>*/}
+                {/* Estado simple "En vivo" en lugar de los botones de control */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    En vivo
+                  </span>
                 </div>
 
                 {/* Barra de progreso */}
-                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                {/*<div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
                   <div
                     className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-100"
                     style={{ width: `${Math.min(100, Math.max(0, simulation.progressPercent))}%` }}
                   />
-                </div>
+                </div>*/}
 
                 {/* Selector de velocidad */}
                 <div className="mb-3">
