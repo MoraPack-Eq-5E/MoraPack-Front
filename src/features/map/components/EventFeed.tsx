@@ -6,17 +6,18 @@
  * 
  * Características:
  * - Auto-scroll opcional
- * - Filtrado por categorías
+ * - Filtrado avanzado por categorías, pedido, vuelo, aeropuerto
  * - Búsqueda de texto
  * - Minimizable/Expandible
  * - Badges por tipo de evento
  * - Timestamps formateados
- * 
- 
+ * - Integración con popup de aviones para pedidos en vuelo
  */
 
-import { useState, useRef, useEffect } from 'react';
-import type { SimulationEvent } from '@/types/simulation.types';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import type { SimulationEvent, EventFilter } from '@/types/simulation.types';
+import { AdvancedEventFilters } from './AdvancedEventFilters';
+import { getOrderTracking, type OrderTrackingResponse } from '@/services/consultas.service';
 
 interface EventFeedProps {
   events: SimulationEvent[];
@@ -25,6 +26,22 @@ interface EventFeedProps {
   onEventClick?: (event: SimulationEvent) => void;
   /** Si true, no muestra el header (para usar embebido en otro contenedor) */
   embedded?: boolean;
+  /** Filtro actual (controlado externamente) */
+  filter?: EventFilter;
+  /** Callback cuando cambia el filtro */
+  onFilterChange?: (filter: EventFilter) => void;
+  /** Lista de aeropuertos para dropdown de filtros */
+  airports?: Array<{ codigoIATA: string; nombre?: string }>;
+  /** Callback para abrir el popup de un avión */
+  onFlightPopupRequest?: (eventId: string) => void;
+  /** Lista de vuelos activos para verificar si un pedido está volando */
+  activeFlights?: Array<{
+    eventId: string;
+    orderIds: number[];
+    flightCode: string;
+  }>;
+  /** Callback para abrir el drawer de detalles de pedido */
+  onOpenOrderDetail?: (orderId: number) => void;
 }
 
 /**
@@ -157,8 +174,36 @@ function formatTimestamp(isoString: string): string {
 /**
  * Componente individual de evento
  */
-function EventItem({ event, onClick }: { event: SimulationEvent; onClick?: (event: SimulationEvent) => void }) {
+function EventItem({ 
+  event, 
+  onClick,
+  onOrderIdClick,
+  onFlightCodeClick,
+}: { 
+  event: SimulationEvent; 
+  onClick?: (event: SimulationEvent) => void;
+  /** Callback cuando se hace clic en un ID de pedido */
+  onOrderIdClick?: (orderId: number) => void;
+  /** Callback cuando se hace clic en un código de vuelo */
+  onFlightCodeClick?: (flightCode: string) => void;
+}) {
   const style = getEventStyle(event.type);
+
+  // Handler para clic en ID de pedido
+  const handleOrderIdClick = (e: React.MouseEvent, orderId: number) => {
+    e.stopPropagation(); // Evitar que dispare el onClick del evento
+    onOrderIdClick?.(orderId);
+  };
+
+  // Handler para clic en código de vuelo
+  const handleFlightCodeClick = (e: React.MouseEvent, flightCode: string) => {
+    e.stopPropagation();
+    onFlightCodeClick?.(flightCode);
+  };
+
+  // Mostrar hasta 5 IDs de pedidos, luego "y X más"
+  const orderIdsToShow = event.relatedOrderIds?.slice(0, 5) || [];
+  const remainingOrderIds = (event.relatedOrderIds?.length || 0) - orderIdsToShow.length;
 
   return (
     <div
@@ -187,32 +232,51 @@ function EventItem({ event, onClick }: { event: SimulationEvent; onClick?: (even
             {event.message}
           </p>
           {/* Información adicional */}
-          <div className="flex items-center gap-3 mt-1.5 text-xs opacity-70">
+          <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
+            {/* Código de vuelo clickeable */}
             {event.relatedFlightCode && (
-              <span className="flex items-center gap-1">
+              <button
+                onClick={(e) => handleFlightCodeClick(e, event.relatedFlightCode!)}
+                className="flex items-center gap-1 px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded hover:bg-sky-200 transition-colors"
+                title={`Filtrar por vuelo ${event.relatedFlightCode}`}
+              >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Vuelo {event.relatedFlightCode}
-              </span>
+                <span className="font-medium">{event.relatedFlightCode}</span>
+              </button>
             )}
             {event.productCount && event.productCount > 0 && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 text-gray-500">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
                 {event.productCount} productos
               </span>
             )}
-            {event.relatedOrderIds && event.relatedOrderIds.length > 0 && (
-              <span className="flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                {event.relatedOrderIds.length} pedido{event.relatedOrderIds.length > 1 ? 's' : ''}
-              </span>
-            )}
           </div>
+          
+          {/* IDs de pedidos clickeables */}
+          {orderIdsToShow.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              <span className="text-[10px] text-gray-500 font-medium">Pedidos:</span>
+              {orderIdsToShow.map((orderId) => (
+                <button
+                  key={orderId}
+                  onClick={(e) => handleOrderIdClick(e, orderId)}
+                  className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                  title={`Filtrar por pedido #${orderId}`}
+                >
+                  #{orderId}
+                </button>
+              ))}
+              {remainingOrderIds > 0 && (
+                <span className="text-[10px] text-gray-400">
+                  +{remainingOrderIds} más
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -228,10 +292,28 @@ export function EventFeed({
   enableSearch = false,
   onEventClick,
   embedded = false,
+  filter: externalFilter,
+  onFilterChange,
+  airports = [],
+  onFlightPopupRequest,
+  activeFlights = [],
+  onOpenOrderDetail,
 }: EventFeedProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Filtro interno si no se provee uno externo
+  const [internalFilter, setInternalFilter] = useState<EventFilter>({
+    categories: ['ALL'],
+    searchTerm: '',
+  });
+
+  // Usar filtro externo si está disponible
+  const filter = externalFilter ?? internalFilter;
+  const handleFilterChange = onFilterChange ?? setInternalFilter;
 
   // Auto-scroll al agregar nuevos eventos
   useEffect(() => {
@@ -240,18 +322,88 @@ export function EventFeed({
     }
   }, [events.length, isExpanded]);
 
-  // Filtrar eventos
+  // Handler para búsqueda de pedido específico
+  const handleOrderSearch = useCallback(async (orderId: string) => {
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      // Primero verificar si el pedido está en los vuelos activos actuales
+      const orderIdNum = parseInt(orderId, 10);
+      const flightWithOrder = activeFlights.find(f => f.orderIds.includes(orderIdNum));
+
+      if (flightWithOrder) {
+        // El pedido está volando - abrir popup del avión
+        console.log(`[EventFeed] Pedido #${orderId} encontrado en vuelo ${flightWithOrder.flightCode}`);
+        if (onFlightPopupRequest) {
+          onFlightPopupRequest(flightWithOrder.eventId);
+        }
+      } else {
+        // Consultar al backend para más información
+        const tracking: OrderTrackingResponse = await getOrderTracking(orderIdNum);
+        
+        if (!tracking.exito) {
+          setSearchError(tracking.mensaje || 'Pedido no encontrado');
+          return;
+        }
+
+        // Si está en vuelo según el backend y tenemos la info
+        if (tracking.isInFlight && tracking.currentFlightInfo?.eventId) {
+          if (onFlightPopupRequest) {
+            onFlightPopupRequest(tracking.currentFlightInfo.eventId);
+          }
+        }
+
+        console.log(`[EventFeed] Tracking pedido #${orderId}:`, tracking);
+      }
+    } catch (error) {
+      console.error('[EventFeed] Error al buscar pedido:', error);
+      setSearchError('Error al buscar pedido. Intenta de nuevo.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [activeFlights, onFlightPopupRequest]);
+
+  // Filtrar eventos (básico para búsqueda de texto - el filtrado avanzado se hace en el hook)
   const filteredEvents = events.filter((event) => {
-    // Filtro de búsqueda
+    // Filtro de búsqueda local (el searchTerm del input simple)
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         event.message.toLowerCase().includes(searchLower) ||
-        event.relatedAirportCode?.toLowerCase().includes(searchLower);
+        event.relatedAirportCode?.toLowerCase().includes(searchLower) ||
+        event.relatedFlightCode?.toLowerCase().includes(searchLower) ||
+        event.relatedOrderId?.toString().includes(searchTerm) ||
+        event.relatedOrderIds?.some(id => id.toString().includes(searchTerm));
       if (!matchesSearch) return false;
     }
     return true;
   });
+
+  // Handler para clic en ID de pedido desde EventItem
+  const handleOrderIdClick = useCallback((orderId: number) => {
+    // Si hay callback para abrir drawer, usarlo
+    if (onOpenOrderDetail) {
+      onOpenOrderDetail(orderId);
+    } else {
+      // Fallback: filtrar por el pedido
+      const orderIdStr = orderId.toString();
+      handleFilterChange({
+        ...filter,
+        orderId: orderIdStr,
+      });
+      // Buscar y abrir popup si está en vuelo
+      handleOrderSearch(orderIdStr);
+    }
+  }, [filter, handleFilterChange, handleOrderSearch, onOpenOrderDetail]);
+
+  // Handler para clic en código de vuelo desde EventItem
+  const handleFlightCodeClick = useCallback((flightCode: string) => {
+    handleFilterChange({
+      ...filter,
+      flightCode: flightCode,
+    });
+  }, [filter, handleFilterChange]);
 
   const toggleExpand = () => setIsExpanded(!isExpanded);
 
@@ -259,12 +411,22 @@ export function EventFeed({
   if (embedded) {
     return (
       <div className="h-full flex flex-col">
-        {/* Búsqueda */}
+        {/* Filtros Avanzados */}
+        <AdvancedEventFilters
+          filter={filter}
+          onFilterChange={handleFilterChange}
+          airports={airports}
+          onOrderSearch={handleOrderSearch}
+          isSearching={isSearching}
+          searchError={searchError}
+        />
+
+        {/* Búsqueda rápida */}
         {enableSearch && (
           <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
             <input
               type="text"
-              placeholder="Buscar eventos..."
+              placeholder="Buscar en eventos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-1.5 text-sm bg-gray-50 text-gray-700 placeholder-gray-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
@@ -293,12 +455,26 @@ export function EventFeed({
                     d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                   />
                 </svg>
-                <p className="text-xs font-medium">No hay eventos aún</p>
-                <p className="text-[10px] mt-0.5">Reproduce la simulación para ver eventos</p>
+                <p className="text-xs font-medium">
+                  {filter.orderId || filter.flightCode || filter.airportCode 
+                    ? 'No hay eventos con estos filtros' 
+                    : 'No hay eventos aún'}
+                </p>
+                <p className="text-[10px] mt-0.5">
+                  {filter.orderId || filter.flightCode || filter.airportCode 
+                    ? 'Intenta ajustar los filtros' 
+                    : 'Reproduce la simulación para ver eventos'}
+                </p>
               </div>
             ) : (
               filteredEvents.map((event) => (
-                <EventItem key={event.id} event={event} onClick={onEventClick} />
+                <EventItem 
+                  key={event.id} 
+                  event={event} 
+                  onClick={onEventClick}
+                  onOrderIdClick={handleOrderIdClick}
+                  onFlightCodeClick={handleFlightCodeClick}
+                />
               ))
             )}
           </div>
@@ -308,12 +484,22 @@ export function EventFeed({
         {events.length > 0 && (
           <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500 flex-shrink-0">
             <span>Mostrando {filteredEvents.length} de {events.length}</span>
-            {searchTerm && (
+            {(searchTerm || filter.orderId || filter.flightCode || filter.airportCode) && (
               <button
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('');
+                  handleFilterChange({
+                    categories: ['ALL'],
+                    searchTerm: '',
+                    orderId: undefined,
+                    flightCode: undefined,
+                    airportCode: undefined,
+                    dateRange: undefined,
+                  });
+                }}
                 className="text-teal-600 hover:text-teal-800 font-medium"
               >
-                Limpiar
+                Limpiar todo
               </button>
             )}
           </div>
@@ -393,7 +579,13 @@ export function EventFeed({
               </div>
             ) : (
               filteredEvents.map((event) => (
-                <EventItem key={event.id} event={event} onClick={onEventClick} />
+                <EventItem 
+                  key={event.id} 
+                  event={event} 
+                  onClick={onEventClick}
+                  onOrderIdClick={handleOrderIdClick}
+                  onFlightCodeClick={handleFlightCodeClick}
+                />
               ))
             )}
           </div>

@@ -17,6 +17,8 @@ export * from './SimulationControls';
 export * from './SimulationControlsFloating';
 export * from './LiveSimulationInfo';
 export * from './EventFeed';
+export * from './AdvancedEventFilters';
+export * from './OrderDetailDrawer';
 export * from './AnimatedFlightMarker';
 export * from './AnimatedFlightPath';
 export * from './RoutesLayer';
