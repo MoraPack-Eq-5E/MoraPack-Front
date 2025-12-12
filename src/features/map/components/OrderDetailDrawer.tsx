@@ -92,7 +92,6 @@ export function OrderDetailDrawer({
   onClose,
   onFilterByOrder,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onFocusOnMap,
   currentFlightInfo,
 }: OrderDetailDrawerProps) {
   const [data, setData] = useState<OrderDetailResponse | null>(null);

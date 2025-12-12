@@ -56,7 +56,7 @@ function isValidCoordinate(coord: number | undefined | null): coord is number {
 }
 
 export function MapViewEnVivo({ resultado, initialTimeUnit, autoPlay, onCompletedOrdersChange, currentRealTime, nextWindowTime, onSimulationEventAdd}: MapViewEnVivoProps) {
-  const [timeUnit, setTimeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
+  const [timeUnit] = useState<TimeUnit>(initialTimeUnit ??'hours');
   const [showControls, setShowControls] = useState(true);
   const [showEventFeed, setShowEventFeed] = useState(true);
   const [selectedAirportId, setSelectedAirportId] = useState<number | null>(null);
