@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MapViewTemporal } from '@/features/map/components';
 import { ejecutarAlgoritmoDiario, type AlgoritmoResponse } from '@/services/algoritmoSemanal.service';
 import { useAirportsForMap } from '@/features/map/hooks';
+import { MapViewDiaADia } from '@/features/map/components/MapViewDiaADia';
 
 export function EnVivoPage() {
 
@@ -215,7 +216,7 @@ export function EnVivoPage() {
           {/* Mapa */}
           <div className="flex-1 border rounded-xl overflow-hidden bg-gray-50">
             {resultadoVentana?.lineaDeTiempo && !airportsLoading ? (
-              <MapViewTemporal resultado={resultadoVentana} initialTimeUnit="seconds" autoPlay />
+              <MapViewDiaADia resultado={resultadoVentana} initialTimeUnit="seconds" autoPlay />
             ) : (
               <div className="h-full flex items-center justify-center text-gray-500">
                 {airportsLoading

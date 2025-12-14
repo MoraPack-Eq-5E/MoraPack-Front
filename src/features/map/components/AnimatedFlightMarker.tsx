@@ -118,6 +118,8 @@ export function AnimatedFlightMarker({
     if (!map) return;
     if (!currentState) return; // No hay coords válidas
 
+    console.log(`[AnimatedFlightMarker] ${flight.flightCode} progress=${flight.currentProgress}, position=${currentState.position}`);
+    
     const { position, bearing } = currentState;
     const [lat, lng] = position;
 
