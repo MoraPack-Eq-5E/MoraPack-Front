@@ -1,6 +1,6 @@
 import { useState, useRef, type DragEvent } from 'react';
 import { ValidationResults } from './ValidationResults';
-import { useFileUploadStore } from '@/store';
+import { useFileUpload } from '../hooks/useFileUpload';
 import { SimulationFileType } from '@/types/fileUpload.types';
 
 interface FileInputCardProps {
@@ -186,11 +186,10 @@ interface FileUploadSectionProps {
 export function FileUploadSection(props: FileUploadSectionProps) {
   const { onValidationSuccess, horaInicio, horaFin, modoSimulacion } = props;
   
-  // Usar el store global para que la subida continúe en background
+  // Usar hook local (más rápido que el store global)
   const {
     filesState,
     clientErrors,
-    importProgress,
     hasFiles,
     isValidated,
     addFile,
@@ -198,7 +197,7 @@ export function FileUploadSection(props: FileUploadSectionProps) {
     removeFileByIndex,
     validateFiles,
     clearAll,
-  } = useFileUploadStore();
+  } = useFileUpload();
   
   // Wrappers que limpian el mensaje de 'limpieza' cuando el usuario realiza acciones
   const handleAddFile = (file: File | File[], type: SimulationFileType) => {
@@ -258,11 +257,12 @@ export function FileUploadSection(props: FileUploadSectionProps) {
           </svg>
           <div>
             <p className="text-sm font-medium text-blue-900">
-              Carga de archivos opcional
+              Tienes dos opciones:
             </p>
-            <p className="text-sm text-blue-700 mt-1">
-              Si no subes archivos, se usarán los datos cargados en el sistema de la base de datos.
-            </p>
+            <ul className="text-sm text-blue-700 mt-1 list-disc list-inside space-y-1">
+              <li><strong>Usar datos de BD:</strong> Ejecuta con los datos ya cargados en el sistema</li>
+              <li><strong>Subir archivos:</strong> Importa nuevos datos desde archivos .txt</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -317,28 +317,31 @@ export function FileUploadSection(props: FileUploadSectionProps) {
         <ValidationResults validationResponse={filesState.validationResponse} />
       )}
       
-      {/* Indicador de progreso de importación (persiste en background) */}
-      {importProgress.isImporting && (
+      {/* Indicador simple de importación en progreso */}
+      {filesState.isValidating && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-blue-900">{importProgress.currentStep}</p>
-              {importProgress.completedSteps.length > 0 && (
-                <p className="text-xs text-blue-700 mt-1">
-                  Completados: {importProgress.completedSteps.join(' → ')}
-                </p>
-              )}
-            </div>
+            <p className="text-sm font-medium text-blue-900">Importando archivos...</p>
           </div>
-          <p className="text-xs text-blue-600 mt-2">
-            💡 Puedes navegar a otras páginas, la importación continuará en segundo plano.
-          </p>
         </div>
       )}
       
-      <div className="flex gap-3">
-        {hasFiles() && !isValidated() && (
+      <div className="flex flex-wrap gap-3">
+        {/* Botón para usar datos de BD (siempre visible si no hay archivos subidos) */}
+        {!hasFiles && !isValidated && (
+          <button
+            onClick={() => onValidationSuccess('database')}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+            Usar datos existentes en BD
+          </button>
+        )}
+        
+        {hasFiles && !isValidated && (
           <button
             onClick={handleValidate}
             disabled={filesState.isValidating}
@@ -348,7 +351,7 @@ export function FileUploadSection(props: FileUploadSectionProps) {
           </button>
         )}
         
-        {hasFiles() && (
+        {hasFiles && (
           <button
             onClick={handleClearAll}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"

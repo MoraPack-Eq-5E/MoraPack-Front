@@ -51,7 +51,7 @@ export function SimulacionPage() {
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mostrarReporte, setMostrarReporte] = useState(true);
+  const [mostrarReporte, setMostrarReporte] = useState(false);
   
   // Hook para obtener aeropuertos
   const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
@@ -69,13 +69,12 @@ export function SimulacionPage() {
   // ==================== PASO 1: CARGA DE DATOS ====================
   
   const handleFileImportSuccess = async (sessionId?: string) => {
-    // setIsLoading(true);
-    // setError(null);
+    const usandoBD = sessionId === 'database';
     
     try {
-      // Los archivos ya fueron importados a BD por FileUploadSection
-      // Solo necesitamos consultar el estado
-      console.log('✅ Archivos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
+      console.log(usandoBD 
+        ? '📊 Usando datos existentes en BD...' 
+        : `✅ Archivos importados exitosamente (Session: ${sessionId})`);
       console.log('📊 Consultando estado de base de datos...');
       
       // IMPORTANTE: Refetch de aeropuertos después de importar
@@ -85,15 +84,16 @@ export function SimulacionPage() {
       const estado = await obtenerEstadoDatosNoDiario();
       setEstadoDatos(estado);
       
-      
       console.log('✅ Datos disponibles en BD:', estado.estadisticas);
       
       setDataCargada(true);
 
-      // Crear un resultado simulado para mostrar en la UI
+      // Crear un resultado para mostrar en la UI
       setResultadoCarga({
         exito: true,
-        mensaje: 'Archivos cargados exitosamente desde tu equipo',
+        mensaje: usandoBD 
+          ? 'Usando datos existentes en la base de datos' 
+          : 'Archivos cargados exitosamente desde tu equipo',
         estadisticas: {
           pedidosCargados: estado.estadisticas.totalPedidos,
           pedidosCreados: estado.estadisticas.totalPedidos,
@@ -169,6 +169,7 @@ export function SimulacionPage() {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       setCurrentStep('results');
+      setMostrarReporte(true); // Mostrar reporte automáticamente al terminar
 
     } catch (err) {
       console.error('❌ Error ejecutando algoritmo:', err);
@@ -738,45 +739,70 @@ export function SimulacionPage() {
         )}
         
         {currentStep === 'results' && resultadoAlgoritmo && (
-            <div className="h-full flex flex-col relative">
-              {/* Botón para mostrar/ocultar reporte */}
-              <button
-                onClick={() => setMostrarReporte(!mostrarReporte)}
-                className={`absolute top-4 right-4 z-20 px-4 py-2 rounded-lg shadow-lg font-medium transition-all ${
-                  mostrarReporte 
-                    ? 'bg-gray-800 text-white hover:bg-gray-700' 
-                    : modoSimulacion === 'COLAPSO' && puntoColapso
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {mostrarReporte ? 'Ocultar reporte' : 'Ver reporte'}
-              </button>
-
-              {/* Reporte flotante */}
-              {mostrarReporte && (
-                <div className="absolute top-4 left-4 z-10 w-[500px] max-h-[calc(100%-2rem)] overflow-auto">
-                  <ReporteResultados
-                    resultado={resultadoAlgoritmo}
-                    modoSimulacion={modoSimulacion}
-                    puntoColapso={puntoColapso}
-                    onClose={() => setMostrarReporte(false)}
-                    onNuevaSimulacion={() => {
-                      setCurrentStep('load-data');
-                      setDataCargada(false);
-                      setResultadoCarga(null);
-                      setEstadoDatos(null);
-                      setResultadoAlgoritmo(null);
-                      setPuntoColapso(null);
-                      setError(null);
-                      setMostrarReporte(true);
-                    }}
-                  />
+            <div className="h-full flex flex-col">
+              {/* Barra superior con botón de reporte */}
+              <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    modoSimulacion === 'COLAPSO' && puntoColapso
+                      ? 'bg-red-100 text-red-800'
+                      : modoSimulacion === 'COLAPSO'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {modoSimulacion === 'COLAPSO' && puntoColapso
+                      ? '🚨 Colapso detectado'
+                      : modoSimulacion === 'COLAPSO'
+                        ? '✅ Sistema estable'
+                        : `📊 Simulación ${modoSimulacion}`
+                    }
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {resultadoAlgoritmo.pedidosAsignados || 0}/{resultadoAlgoritmo.totalPedidos || 0} pedidos asignados
+                  </span>
                 </div>
-              )}
+                <button
+                  onClick={() => setMostrarReporte(!mostrarReporte)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    mostrarReporte 
+                      ? 'bg-gray-800 text-white hover:bg-gray-700' 
+                      : modoSimulacion === 'COLAPSO' && puntoColapso
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {mostrarReporte ? 'Ocultar reporte' : 'Ver reporte'}
+                </button>
+              </div>
 
-              {/* Mapa a pantalla completa */}
-              <div className="flex-1 overflow-hidden">
+              {/* Contenedor principal: mapa + reporte */}
+              <div className="flex-1 overflow-hidden relative">
+                {/* Reporte flotante */}
+                {mostrarReporte && (
+                  <div className="absolute top-4 left-4 z-[1001] w-[480px] max-h-[calc(100%-2rem)] overflow-y-auto shadow-2xl rounded-xl">
+                    <ReporteResultados
+                      resultado={resultadoAlgoritmo}
+                      modoSimulacion={modoSimulacion}
+                      puntoColapso={puntoColapso}
+                      onClose={() => setMostrarReporte(false)}
+                      onNuevaSimulacion={() => {
+                        setCurrentStep('load-data');
+                        setDataCargada(false);
+                        setResultadoCarga(null);
+                        setEstadoDatos(null);
+                        setResultadoAlgoritmo(null);
+                        setPuntoColapso(null);
+                        setError(null);
+                        setMostrarReporte(false);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Mapa */}
                 {resultadoAlgoritmo?.lineaDeTiempo && !airportsLoading ? (
                   <MapViewTemporal
                     resultado={resultadoAlgoritmo as AlgoritmoResponse}
