@@ -5,7 +5,7 @@
  * Permite que la simulación continúe ejecutándose en background
  * cuando el usuario navega a otras páginas.
  */
-
+/*
 import { create } from 'zustand';
 import type { AlgoritmoResponse, ResultadoColapsoDTO } from '@/services/algoritmoSemanal.service';
 import type { CargaDatosResponse, EstadoDatosResponse } from '@/services/cargaDatos.service';
@@ -286,3 +286,4 @@ export const selectHasActiveSimulation = (state: SimulationState) => {
   return state.resultadoAlgoritmo !== null && state.currentStep === 'results';
 };
 
+*/

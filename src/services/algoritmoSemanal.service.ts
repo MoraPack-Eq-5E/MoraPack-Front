@@ -304,7 +304,7 @@ export function detectarPuntoColapso(resultado: AlgoritmoResponse): PuntoColapso
   const primerFallo = pedidosOrdenados[0];
   
   // Contar cuántos pedidos hay antes y después del colapso
-  const fechaColapso = new Date(primerFallo.fechaPedido);
+  //const fechaColapso = new Date(primerFallo.fechaPedido);
   const pedidosAntesColapso = resultado.pedidosAsignados || 0;
   const pedidosDespuesColapso = resultado.pedidosNoAsignados || 0;
   

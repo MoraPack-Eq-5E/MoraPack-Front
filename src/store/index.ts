@@ -1,7 +1,7 @@
 /**
  * Store exports
  */
-
+/*
 export { 
   useSimulationStore,
   selectProgressPercent,
@@ -12,5 +12,5 @@ export {
   type TimeUnit,
 } from './simulationStore';
 
-export { useFileUploadStore } from './fileUploadStore';
+export { useFileUploadStore } from './fileUploadStore';*/
 
