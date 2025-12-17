@@ -29,16 +29,33 @@ export interface AlgoritmoRequest {
   inicioOperacionDiaADia?: boolean;
 }
 
+/**
+ * Información de un pedido no asignado - para detección de colapso
+ */
+export interface PedidoNoAsignadoInfoDTO {
+  id: number;
+  fechaPedido: string; // ISO datetime
+  fechaLimiteEntrega: string; // ISO datetime
+  codigoOrigen: string;
+  codigoDestino: string;
+  cantidadProductos: number;
+  motivo: string;
+}
+
 export interface AlgoritmoResponse {
   // Estado
-  exito: boolean;
+  exito?: boolean;
+  exitoso?: boolean; // Backend usa 'exitoso'
   mensaje: string;
   ejecucionId?: number;
   
   // Métricas de tiempo
-  tiempoInicioEjecucion: string;
-  tiempoFinEjecucion: string;
-  tiempoEjecucionSegundos: number;
+  tiempoInicioEjecucion?: string;
+  tiempoFinEjecucion?: string;
+  tiempoEjecucionSegundos?: number;
+  horaInicio?: string; // Backend usa estos nombres
+  horaFin?: string;
+  segundosEjecucion?: number;
   
   // Ventana de simulación
   horaInicioSimulacion?: string;
@@ -46,20 +63,22 @@ export interface AlgoritmoResponse {
   
   // Métricas de pedidos
   totalPedidos: number;
-  pedidosAsignados: number;
-  pedidosNoAsignados: number;
+  pedidosAsignados?: number;
+  pedidosNoAsignados?: number;
   pedidosNoAsignadosIds?: number[];
+  pedidosNoAsignadosInfo?: PedidoNoAsignadoInfoDTO[]; // Info detallada para detectar colapso
   
   // Métricas de productos
   totalProductos: number;
-  productosAsignados: number;
-  productosNoAsignados: number;
+  productosAsignados?: number;
+  productosNoAsignados?: number;
   productosPersistidos?: number;
   
   // Calidad de solución
   costoTotal?: number;
   costoPromedioPorProducto?: number;
   tiempoPromedioEntrega?: number;
+  porcentajeAsignacion?: number;
   
   // Métricas de vuelos
   totalVuelos?: number;
@@ -71,6 +90,9 @@ export interface AlgoritmoResponse {
   
   // Timeline de simulación (para visualización)
   lineaDeTiempo?: LineaDeTiempoSimulacionDTO;
+  
+  // Rutas de productos
+  rutasProductos?: RutaProductoDTO[];
 }
 
 // ============================================================================
@@ -216,40 +238,45 @@ export async function ejecutarAlgoritmo(
   return response.json();
 }
 
-//COLAPSO
-export interface ResultadoColapsoDTO {
-  exitoso: boolean;
-  mensaje: string;
-  horaInicio: string;
-  horaFin: string;
-  duracionSegundos: number;
-  iteracionesTotales: number;
-  tipoColapso: string;
-  condicionesColapso: string[];
-  bottlenecks: string[];
-  pedidosAsignados: number;
-  pedidosTotales: number;
-  almacenesLlenos: number;
-  vuelosSaturados: number;
-  //rutasProductos: RutaProductoDTO[]; 
-  metricasDetalladas: Record<string, unknown>;
-  // NUEVO: Agregar línea de tiempo para el mapa
-  lineaDeTiempo?: LineaDeTiempoSimulacionDTO;
+// ============================================================================
+// MODO COLAPSO - Usa el mismo endpoint semanal pero SIN límite de días
+// El frontend detecta el punto de colapso basándose en pedidosNoAsignadosInfo
+// ============================================================================
+
+/**
+ * Información del punto de colapso detectado en frontend
+ */
+export interface PuntoColapso {
+  pedidoId: number;
+  fechaColapso: string; // Fecha del pedido que causó el colapso
+  fechaLimiteEntrega: string;
+  codigoOrigen: string;
+  codigoDestino: string;
+  motivo: string;
+  pedidosAntesColapso: number;
+  pedidosDespuesColapso: number;
 }
 
 /**
- * Ejecuta el algoritmo ALNS en modo colapso
- * POST /api/algoritmo/colapso
+ * Ejecuta el algoritmo ALNS en modo colapso (INDEFINIDO hasta encontrar colapso)
+ * Usa el mismo endpoint semanal pero SIN límite de días - procesa todos los pedidos
+ * POST /api/algoritmo/semanal
  */
 export async function ejecutarAlgoritmoColapso(
   request: AlgoritmoRequest
-): Promise<ResultadoColapsoDTO> {
-  const response = await fetch(`${API_URL}/api/algoritmo/colapso`, {
+): Promise<AlgoritmoResponse> {
+  // En modo colapso, no enviamos duracionSimulacionDias para procesar TODOS los pedidos
+  const requestColapso: AlgoritmoRequest = {
+    ...request,
+    duracionSimulacionDias: 365, // Procesar hasta 1 año (efectivamente "todos")
+  };
+  
+  const response = await fetch(`${API_URL}/api/algoritmo/semanal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify(requestColapso),
   });
 
   if (!response.ok) {
@@ -258,4 +285,72 @@ export async function ejecutarAlgoritmoColapso(
   }
 
   return response.json();
+}
+
+/**
+ * Detecta el punto de colapso basándose en los pedidos no asignados
+ * Retorna el primer pedido cronológicamente que no pudo ser asignado
+ */
+export function detectarPuntoColapso(resultado: AlgoritmoResponse): PuntoColapso | null {
+  if (!resultado.pedidosNoAsignadosInfo || resultado.pedidosNoAsignadosInfo.length === 0) {
+    return null; // No hubo colapso, todos los pedidos fueron asignados
+  }
+  
+  // Ordenar por fecha de pedido (cronológico) y obtener el primero
+  const pedidosOrdenados = [...resultado.pedidosNoAsignadosInfo].sort(
+    (a, b) => new Date(a.fechaPedido).getTime() - new Date(b.fechaPedido).getTime()
+  );
+  
+  const primerFallo = pedidosOrdenados[0];
+  
+  // Contar cuántos pedidos hay antes y después del colapso
+  const fechaColapso = new Date(primerFallo.fechaPedido);
+  const pedidosAntesColapso = resultado.pedidosAsignados || 0;
+  const pedidosDespuesColapso = resultado.pedidosNoAsignados || 0;
+  
+  return {
+    pedidoId: primerFallo.id,
+    fechaColapso: primerFallo.fechaPedido,
+    fechaLimiteEntrega: primerFallo.fechaLimiteEntrega,
+    codigoOrigen: primerFallo.codigoOrigen,
+    codigoDestino: primerFallo.codigoDestino,
+    motivo: primerFallo.motivo || "No se encontró ruta válida dentro del deadline",
+    pedidosAntesColapso,
+    pedidosDespuesColapso,
+  };
+}
+
+/**
+ * Recorta el timeline hasta el punto de colapso
+ * Solo incluye eventos que ocurren antes de la fecha del colapso
+ */
+export function recortarTimelineHastaColapso(
+  timeline: LineaDeTiempoSimulacionDTO | undefined,
+  fechaColapso: string
+): LineaDeTiempoSimulacionDTO | undefined {
+  if (!timeline || !timeline.eventos) {
+    return timeline;
+  }
+  
+  const fechaLimite = new Date(fechaColapso);
+  
+  // Filtrar eventos que ocurren antes del colapso
+  const eventosRecortados = timeline.eventos.filter(
+    evento => new Date(evento.horaEvento) <= fechaLimite
+  );
+  
+  // Recalcular métricas
+  const horaFinRecortada = eventosRecortados.length > 0
+    ? eventosRecortados[eventosRecortados.length - 1].horaEvento
+    : timeline.horaInicioSimulacion;
+  
+  return {
+    ...timeline,
+    eventos: eventosRecortados,
+    horaFinSimulacion: horaFinRecortada,
+    totalEventos: eventosRecortados.length,
+    duracionTotalMinutos: Math.floor(
+      (new Date(horaFinRecortada).getTime() - new Date(timeline.horaInicioSimulacion).getTime()) / 60000
+    ),
+  };
 }
