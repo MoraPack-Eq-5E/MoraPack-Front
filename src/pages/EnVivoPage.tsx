@@ -83,7 +83,7 @@ export function EnVivoPage() {
   const [pedidoError, setPedidoError] = useState<string | null>(null);
   const [ultimoPedidoId, setUltimoPedidoId] = useState<number | null>(null);
   const [clienteId, setClienteId] = useState<string>("");
-
+  const [pedidoId, setPedidoId] = useState<string>("");
   // Referencia a la función addSimulationEvent del mapa
   type SimulationEventType = 'FLIGHT_DEPARTURE' | 'FLIGHT_ARRIVAL' | 'FLIGHT_CANCELED' | 'ORDER_DEPARTED' | 'ORDER_CREATED' | 'ORDER_ARRIVED_AIRPORT' | 'ORDER_AT_DESTINATION' | 'ORDER_PICKED_UP' | 'ORDER_DELIVERED' | 'WAREHOUSE_WARNING' | 'WAREHOUSE_CRITICAL' | 'WAREHOUSE_FULL' | 'SLA_RISK' | 'INFO';
   const addSimulationEventRef = useRef<((type: SimulationEventType, message: string, simulatedTime: Date, details?: {
@@ -403,6 +403,7 @@ export function EnVivoPage() {
         cantidadProductos: cantidad,
         fechaPedido: horaSiguienteVentana,
         clienteId: Number(clienteId),
+        pedidoId: String (pedidoId),
       });
 
       setUltimoPedidoId(nuevoId);
@@ -629,6 +630,17 @@ export function EnVivoPage() {
                 </div>
 
                 <form className="space-y-2" onSubmit={handleSubmitNuevoPedido}>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                      Pedido Id
+                    </label>
+                    <input
+                        value={pedidoId}
+                        onChange={(e) => setPedidoId(e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Ej: 14064"
+                    />
+                  </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700 mb-1">
                       Código aeropuerto destino

@@ -10,16 +10,20 @@
  * La simulación continúa en background cuando el usuario navega a otras páginas.
  */
 import { useState } from 'react';
-import { FileUploadSection } from '@/features/simulation/components/FileUploadSection';
+import { FileUploadSection, ReporteResultados } from '@/features/simulation/components';
 import {
   obtenerEstadoDatosNoDiario,
   type CargaDatosResponse,
   type EstadoDatosResponse
 } from '@/services/cargaDatos.service';
-import { ejecutarAlgoritmoSemanal, 
+import { 
+  ejecutarAlgoritmoSemanal, 
   ejecutarAlgoritmoColapso,
-  type AlgoritmoRequest, type AlgoritmoResponse,
-  type ResultadoColapsoDTO
+  detectarPuntoColapso,
+  recortarTimelineHastaColapso,
+  type AlgoritmoRequest, 
+  type AlgoritmoResponse,
+  type PuntoColapso
 } from '@/services/algoritmoSemanal.service';
 import { consultarEstadisticasAsignacion, consultarVuelos, consultarPedidos } from '@/services/consultas.service';
 import { MapViewTemporal } from '@/features/map/components';
@@ -38,13 +42,16 @@ export function SimulacionPage() {
   const [resultadoCarga, setResultadoCarga] = useState<CargaDatosResponse | null>(null);
   const [estadoDatos, setEstadoDatos] = useState<EstadoDatosResponse | null>(null);
 
-  // Estado del algoritmo - ahora puede ser de ambos tipos
-  const [resultadoAlgoritmo, setResultadoAlgoritmo] = useState<AlgoritmoResponse |
-      ResultadoColapsoDTO | null>(null);
+  // Estado del algoritmo
+  const [resultadoAlgoritmo, setResultadoAlgoritmo] = useState<AlgoritmoResponse | null>(null);
+  
+  // Estado del punto de colapso (solo para modo COLAPSO)
+  const [puntoColapso, setPuntoColapso] = useState<PuntoColapso | null>(null);
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarReporte, setMostrarReporte] = useState(false);
   
   // Hook para obtener aeropuertos
   const { isLoading: airportsLoading, refetch: refetchAirports } = useAirportsForMap();
@@ -62,13 +69,12 @@ export function SimulacionPage() {
   // ==================== PASO 1: CARGA DE DATOS ====================
   
   const handleFileImportSuccess = async (sessionId?: string) => {
-    // setIsLoading(true);
-    // setError(null);
+    const usandoBD = sessionId === 'database';
     
     try {
-      // Los archivos ya fueron importados a BD por FileUploadSection
-      // Solo necesitamos consultar el estado
-      console.log('✅ Archivos importados exitosamente', sessionId ? `(Session: ${sessionId})` : '');
+      console.log(usandoBD 
+        ? '📊 Usando datos existentes en BD...' 
+        : `✅ Archivos importados exitosamente (Session: ${sessionId})`);
       console.log('📊 Consultando estado de base de datos...');
       
       // IMPORTANTE: Refetch de aeropuertos después de importar
@@ -78,15 +84,16 @@ export function SimulacionPage() {
       const estado = await obtenerEstadoDatosNoDiario();
       setEstadoDatos(estado);
       
-      
       console.log('✅ Datos disponibles en BD:', estado.estadisticas);
       
       setDataCargada(true);
 
-      // Crear un resultado simulado para mostrar en la UI
+      // Crear un resultado para mostrar en la UI
       setResultadoCarga({
         exito: true,
-        mensaje: 'Archivos cargados exitosamente desde tu equipo',
+        mensaje: usandoBD 
+          ? 'Usando datos existentes en la base de datos' 
+          : 'Archivos cargados exitosamente desde tu equipo',
         estadisticas: {
           pedidosCargados: estado.estadisticas.totalPedidos,
           pedidosCreados: estado.estadisticas.totalPedidos,
@@ -117,31 +124,52 @@ export function SimulacionPage() {
   const handleStartSimulation = async () => {
     setIsLoading(true);
     setError(null);
+    setPuntoColapso(null);
     setCurrentStep('running');
     
     try {
       console.log(`🚀 Ejecutando algoritmo en modo ${modoSimulacion}...`);
       console.log('Configuración:', config);
 
-      let resultado;
+      let resultado: AlgoritmoResponse;
       if (modoSimulacion === 'SEMANAL') {
         resultado = await ejecutarAlgoritmoSemanal(config);
       } else {
-        // Modo COLAPSO
+        // Modo COLAPSO - procesa todos los pedidos
         resultado = await ejecutarAlgoritmoColapso(config);
+        
+        // Detectar punto de colapso
+        const colapso = detectarPuntoColapso(resultado);
+        if (colapso) {
+          console.log('🚨 COLAPSO DETECTADO:', colapso);
+          setPuntoColapso(colapso);
+          
+          // Recortar timeline hasta el punto de colapso
+          if (resultado.lineaDeTiempo) {
+            resultado = {
+              ...resultado,
+              lineaDeTiempo: recortarTimelineHastaColapso(resultado.lineaDeTiempo, colapso.fechaColapso)
+            };
+          }
+        } else {
+          console.log('✅ No se detectó colapso - el sistema soportó toda la carga');
+        }
       }
+      
       setResultadoAlgoritmo(resultado);
 
       console.log(`✅ Algoritmo ${modoSimulacion} completado:`, {
-        productosAsignados: 'productosAsignados' in resultado ? resultado.productosAsignados : 'N/A',
-        pedidosAsignados: 'pedidosAsignados' in resultado ? resultado.pedidosAsignados : 'N/A',
-        segundosEjecucion: 'tiempoEjecucionSegundos' in resultado ? resultado.tiempoEjecucionSegundos : resultado.duracionSegundos,
+        productosAsignados: resultado.productosAsignados ?? resultado.totalProductos,
+        pedidosAsignados: resultado.pedidosAsignados,
+        pedidosNoAsignados: resultado.pedidosNoAsignados,
+        segundosEjecucion: resultado.tiempoEjecucionSegundos ?? resultado.segundosEjecucion,
       });
 
       // Esperar un momento para que se persistan los datos
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       setCurrentStep('results');
+      setMostrarReporte(true); // Mostrar reporte automáticamente al terminar
 
     } catch (err) {
       console.error('❌ Error ejecutando algoritmo:', err);
@@ -407,33 +435,47 @@ export function SimulacionPage() {
                   />
                   <span>Simulación por colapso (sin límite de tiempo)</span>
                 </label>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Se cargarán pedidos desde <strong>{formatearFechaLegible(config.horaInicioSimulacion!)}</strong> hasta <strong>{formatearFechaLegible(calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!))}</strong>
-                  </p>
               </div>
+              {modoSimulacion === 'SEMANAL' && (
+                <p className="text-xs text-blue-700 mt-2">
+                  Se cargarán pedidos desde <strong>{formatearFechaLegible(config.horaInicioSimulacion!)}</strong> hasta <strong>{formatearFechaLegible(calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!))}</strong>
+                </p>
+              )}
+              {modoSimulacion === 'COLAPSO' && (
+                <p className="text-xs text-amber-700 mt-2">
+                  Se ejecutará desde <strong>{formatearFechaLegible(config.horaInicioSimulacion!)}</strong> hasta que se detecte el punto de colapso o se procesen todos los pedidos
+                </p>
+              )}
             </div>
 
-            {/* Configuración de ventana de tiempo - solo para SEMANAL */}
-            {modoSimulacion === 'SEMANAL' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-blue-900 mb-3">Ventana de Tiempo - Escenario Semanal</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-blue-900 mb-2">
-                      Fecha de inicio
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={config.horaInicioSimulacion?.slice(0, 16)}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          horaInicioSimulacion: e.target.value + ':00',
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+            {/* Configuración de ventana de tiempo */}
+            <div className={`${modoSimulacion === 'SEMANAL' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-4 mb-6`}>
+              <h3 className={`font-semibold ${modoSimulacion === 'SEMANAL' ? 'text-blue-900' : 'text-amber-900'} mb-3`}>
+                {modoSimulacion === 'SEMANAL' ? 'Ventana de Tiempo - Escenario Semanal' : 'Fecha de Inicio - Simulación de Colapso'}
+              </h3>
+              <div className={modoSimulacion === 'SEMANAL' ? 'grid grid-cols-2 gap-4' : ''}>
+                <div>
+                  <label className={`block text-sm font-medium ${modoSimulacion === 'SEMANAL' ? 'text-blue-900' : 'text-amber-900'} mb-2`}>
+                    Fecha de inicio
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={config.horaInicioSimulacion?.slice(0, 16)}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        horaInicioSimulacion: e.target.value + ':00',
+                      })
+                    }
+                    className={`w-full px-3 py-2 border ${modoSimulacion === 'SEMANAL' ? 'border-blue-300 focus:ring-blue-500' : 'border-amber-300 focus:ring-amber-500'} rounded-lg focus:ring-2`}
+                  />
+                  {modoSimulacion === 'COLAPSO' && (
+                    <p className="text-xs text-amber-700 mt-2">
+                      Se procesarán todos los pedidos desde esta fecha hasta encontrar el punto de colapso
+                    </p>
+                  )}
+                </div>
+                {modoSimulacion === 'SEMANAL' && (
                   <div>
                     <label className="block text-sm font-medium text-blue-900 mb-2">
                       Duración (días)
@@ -459,9 +501,9 @@ export function SimulacionPage() {
                       )}
                     </p>
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Para modo COLAPSO, mostrar información específica */}
             {modoSimulacion === 'COLAPSO' && (
@@ -488,7 +530,7 @@ export function SimulacionPage() {
               <h3 className="font-semibold text-gray-900 mb-3">Subir archivos desde tu equipo</h3>
               <FileUploadSection 
                 onValidationSuccess={handleFileImportSuccess} 
-                horaInicio={modoSimulacion === 'SEMANAL' ? config.horaInicioSimulacion : undefined}
+                horaInicio={config.horaInicioSimulacion}
                 horaFin={modoSimulacion === 'SEMANAL' ? 
                   calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!) : undefined}
                 modoSimulacion={modoSimulacion}
@@ -697,36 +739,73 @@ export function SimulacionPage() {
         )}
         
         {currentStep === 'results' && resultadoAlgoritmo && (
-          // <><>
-          //   {modoSimulacion === 'SEMANAL'
-          //     ? renderResultadosSemanales()
-          //     : renderResultadosColapso()}
-          // </>
             <div className="h-full flex flex-col">
-              {/* Header de métricas - ELIMINADO para dar más espacio al mapa */}
+              {/* Barra superior con botón de reporte */}
+              <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    modoSimulacion === 'COLAPSO' && puntoColapso
+                      ? 'bg-red-100 text-red-800'
+                      : modoSimulacion === 'COLAPSO'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {modoSimulacion === 'COLAPSO' && puntoColapso
+                      ? '🚨 Colapso detectado'
+                      : modoSimulacion === 'COLAPSO'
+                        ? '✅ Sistema estable'
+                        : `📊 Simulación ${modoSimulacion}`
+                    }
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {resultadoAlgoritmo.pedidosAsignados || 0}/{resultadoAlgoritmo.totalPedidos || 0} pedidos asignados
+                  </span>
+                </div>
+                <button
+                  onClick={() => setMostrarReporte(!mostrarReporte)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    mostrarReporte 
+                      ? 'bg-gray-800 text-white hover:bg-gray-700' 
+                      : modoSimulacion === 'COLAPSO' && puntoColapso
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {mostrarReporte ? 'Ocultar reporte' : 'Ver reporte'}
+                </button>
+              </div>
 
-              {/* Mapa a pantalla completa */}
-              <div className="flex-1 overflow-hidden">
+              {/* Contenedor principal: mapa + reporte */}
+              <div className="flex-1 overflow-hidden relative">
+                {/* Reporte flotante */}
+                {mostrarReporte && (
+                  <div className="absolute top-4 left-4 z-[1001] w-[480px] max-h-[calc(100%-2rem)] overflow-y-auto shadow-2xl rounded-xl">
+                    <ReporteResultados
+                      resultado={resultadoAlgoritmo}
+                      modoSimulacion={modoSimulacion}
+                      puntoColapso={puntoColapso}
+                      onClose={() => setMostrarReporte(false)}
+                      onNuevaSimulacion={() => {
+                        setCurrentStep('load-data');
+                        setDataCargada(false);
+                        setResultadoCarga(null);
+                        setEstadoDatos(null);
+                        setResultadoAlgoritmo(null);
+                        setPuntoColapso(null);
+                        setError(null);
+                        setMostrarReporte(false);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Mapa */}
                 {resultadoAlgoritmo?.lineaDeTiempo && !airportsLoading ? (
                   <MapViewTemporal
-                    resultado={
-                      resultadoAlgoritmo as AlgoritmoResponse
-                      // modoSimulacion === 'SEMANAL'
-                      //   ? (resultadoAlgoritmo as AlgoritmoResponse)
-                      //   : ({
-                      //       exito: true,
-                      //       mensaje: `Simulación de colapso: ${(resultadoAlgoritmo as ResultadoColapsoDTO).tipoColapso}`,
-                      //       lineaDeTiempo: (resultadoAlgoritmo as ResultadoColapsoDTO).lineaDeTiempo,
-                      //       tiempoInicioEjecucion: new Date().toISOString(),
-                      //       tiempoFinEjecucion: new Date(Date.now() + ((resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0) * 1000).toISOString(),
-                      //       tiempoEjecucionSegundos: (resultadoAlgoritmo as ResultadoColapsoDTO).duracionSegundos || 0,
-                      //       totalProductos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                      //       totalPedidos: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosTotales,
-                      //       productosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                      //       pedidosAsignados: (resultadoAlgoritmo as ResultadoColapsoDTO).pedidosAsignados,
-                      //       costoTotal: 0,
-                      //     } as AlgoritmoResponse)
-                    }
+                    resultado={resultadoAlgoritmo as AlgoritmoResponse}
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center bg-gray-100">
