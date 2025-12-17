@@ -20,6 +20,7 @@ export interface CrearPedidoRequest {
     cantidadProductos: number;
     fechaPedido: string;
     clienteId: number;
+    pedidoId: string;
     // Opcionales (por si luego quieres usarlos)
     //aeropuertoOrigenCodigo?: string | null;
     //fechaPedido?: string;        // ISO
@@ -42,6 +43,7 @@ export async function crearPedidoDiaADia(
         fechaPedido: payload.fechaPedido,
         tipoData: 1,          // Día a día
         clienteId: payload.clienteId,
+        pedidoId: payload.pedidoId,
     };
 
     const response = await fetch(`${API_URL}/api/pedidos/en-vivo`, {

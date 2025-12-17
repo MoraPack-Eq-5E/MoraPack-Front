@@ -529,7 +529,7 @@ export function SimulacionPage() {
               <h3 className="font-semibold text-gray-900 mb-3">Subir archivos desde tu equipo</h3>
               <FileUploadSection 
                 onValidationSuccess={handleFileImportSuccess} 
-                horaInicio={modoSimulacion === 'SEMANAL' ? config.horaInicioSimulacion : undefined}
+                horaInicio={config.horaInicioSimulacion}
                 horaFin={modoSimulacion === 'SEMANAL' ? 
                   calcularHoraFin(config.horaInicioSimulacion!, config.duracionSimulacionDias!) : undefined}
                 modoSimulacion={modoSimulacion}
