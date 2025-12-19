@@ -14,7 +14,7 @@ interface FileInputCardProps {
   acceptMultiple?: boolean;
 }
 
-function FileInputCard({
+export default function FileInputCard({
   title,
   description,
   file,
@@ -176,15 +176,18 @@ function FileInputCard({
 }
 
 interface FileUploadSectionProps {
-  onValidationSuccess: (sessionId: string) => void | Promise<void>;
+  onValidationSuccess: (sessionId: string,files?: File[]) => void;
+  onValidationError?: (error: string) => void;
   horaInicio?: string;
   horaFin?: string;
   modoSimulacion: string;
   onClear?: () => void; // callback que indica que la BD y el estado local fueron limpiados
+  onUseExistingData?: () => void;
+  showUseExistingOption?: boolean;
 }
 
 export function FileUploadSection(props: FileUploadSectionProps) {
-  const { onValidationSuccess, horaInicio, horaFin, modoSimulacion } = props;
+  const { onValidationSuccess, onValidationError, horaInicio, horaFin, modoSimulacion } = props;
   
   // Usar hook local (más rápido que el store global)
   const {
@@ -216,12 +219,17 @@ export function FileUploadSection(props: FileUploadSectionProps) {
   };
 
   const handleValidate = async () => {
-    // Al iniciar una nueva validación/importe, limpiar mensajes previos de "limpieza"
-    setClearMessage(null);
-    const result = await validateFiles(modoSimulacion,horaInicio, horaFin,);
-    if (result?.success && result.sessionId) {
-      // Llamar onValidationSuccess y esperar si es async
-      await onValidationSuccess(result.sessionId);
+      const response = await validateAll() as { success: boolean; message?: string; sessionId?: string | null };
+      
+      // Verificamos que response no sea null y que sea exitoso
+      if (response && response.success && response.sessionId) {
+      // Pasamos el sessionId y los archivos de pedidos que están en el estado
+      onValidationSuccess(response.sessionId, filesState.pedidos?.map(p => p.file)); 
+    } else {
+      // Si falló, el hook useFileUpload ya maneja los errores en validationResponse
+      if (onValidationError && !response?.success) {
+        onValidationError(response?.message || 'Error en la validación de archivos');
+      }
     }
   };
 
@@ -370,3 +378,65 @@ export function FileUploadSection(props: FileUploadSectionProps) {
     </div>
   );
 }
+const validateAll = async () => {
+  try {
+    const result = await useValidateFiles();
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido durante la validación';
+    onValidationError?.(errorMessage);
+    return {
+      success: false,
+      message: errorMessage,
+      sessionId: null,
+    };
+  }
+};
+function useValidateFiles() {
+  const { filesState } = useFileUpload();
+
+  return async () => {
+    try {
+      const formData = new FormData();
+      
+      if (filesState.aeropuertos?.file) {
+        formData.append('aeropuertos', filesState.aeropuertos.file);
+      }
+      if (filesState.vuelos?.file) {
+        formData.append('vuelos', filesState.vuelos.file);
+      }
+      if (filesState.pedidos && filesState.pedidos.length > 0) {
+        filesState.pedidos.forEach((pedido, index) => {
+          formData.append(`pedidos_${index}`, pedido.file);
+        });
+      }
+      if (filesState.cancelaciones?.file) {
+        formData.append('cancelaciones', filesState.cancelaciones.file);
+      }
+
+      const response = await fetch('/api/simulation/validate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Error en la validación del servidor');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  };
+}
+function onValidationError(errorMessage: string) {
+  // Aquí puedes manejar el error de validación, por ejemplo, mostrando un mensaje en la interfaz de usuario
+  console.error("Error de validación:", errorMessage);
+  // Puedes también actualizar el estado local o llamar a un callback para notificar al componente padre
+  setClearMessage(errorMessage);
+}
+
+function setClearMessage(errorMessage: string) {
+  throw new Error('Function not implemented.');
+}
+

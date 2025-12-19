@@ -3,7 +3,7 @@
  * Barra lateral de navegación
  */
 
-import { LayoutDashboard, Eye, Play, Plane } from 'lucide-react';
+import { LayoutDashboard, Eye, Play, Plane, Activity } from 'lucide-react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 
 interface MenuItem {
@@ -28,9 +28,16 @@ const menuItems: MenuItem[] = [
   },
   {
     id: 'simulacion',
-    label: 'Simulación',
+    label: 'Semanal',
     icon: <Play size={24} />,
     path: '/simulacion',
+  },
+  // 2. Nueva pestaña de Colapso
+  {
+    id: 'colapso',
+    label: 'Colapso',
+    icon: <Activity size={24} />, 
+    path: '/colapso',
   },
   {
     id: 'aeropuertos',

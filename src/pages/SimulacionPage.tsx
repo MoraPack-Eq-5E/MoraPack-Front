@@ -83,7 +83,7 @@ export function SimulacionPage() {
       // Obtener estado de datos desde BD
       const estado = await obtenerEstadoDatosNoDiario();
       setEstadoDatos(estado);
-      
+
       console.log('✅ Datos disponibles en BD:', estado.estadisticas);
       
       setDataCargada(true);
@@ -106,6 +106,11 @@ export function SimulacionPage() {
         tiempoFin: new Date().toISOString(),
       });
       
+      // === EL CAMBIO CLAVE: Salto automático al paso 2 ===
+      if (usandoBD) {
+        setCurrentStep('config'); // Esto te mueve a la configuración de inmediato
+      }
+
     } catch (err) {
       console.error('❌ Error consultando datos:', err);
       setError(err instanceof Error ? err.message : 'Error al consultar datos');

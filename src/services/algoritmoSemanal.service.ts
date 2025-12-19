@@ -94,7 +94,13 @@ export interface AlgoritmoResponse {
   // Rutas de productos
   rutasProductos?: RutaProductoDTO[];
 }
-
+/**
+ * Interfaz para el payload que espera el servidor
+ */
+export interface ColapsoRequest {
+  sessionId: string;
+  horaInicioSimulacion: string;
+}
 // ============================================================================
 // TIPOS PARA TIMELINE DE SIMULACIÓN
 // ============================================================================
@@ -286,7 +292,22 @@ export async function ejecutarAlgoritmoColapso(
 
   return response.json();
 }
-
+export async function ejecutarAlgoritmoColapsoInMem(
+  payload: ColapsoRequest // ✅ Ahora recibe un objeto simple
+): Promise<AlgoritmoResponse> {
+  const response = await fetch(`${API_URL}/api/algoritmo/colapso-en-ram`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', // ✅ Indicamos que enviamos JSON
+    },
+    body: JSON.stringify(payload), // ✅ Convertimos el objeto a string
+});
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.mensaje || `Error al ejecutar algoritmo de colapso inMem: ${response.statusText}`);
+  }
+  return response.json();
+}
 /**
  * Detecta el punto de colapso basándose en los pedidos no asignados
  * Retorna el primer pedido cronológicamente que no pudo ser asignado

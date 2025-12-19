@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSimulacionRouteImport } from './routes/_authenticated/simulacion'
 import { Route as AuthenticatedEnVivoRouteImport } from './routes/_authenticated/en-vivo'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedColapsoRouteImport } from './routes/_authenticated/colapso'
 import { Route as AuthenticatedAeropuertosRouteImport } from './routes/_authenticated/aeropuertos'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -46,6 +47,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedColapsoRoute = AuthenticatedColapsoRouteImport.update({
+  id: '/colapso',
+  path: '/colapso',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAeropuertosRoute =
   AuthenticatedAeropuertosRouteImport.update({
     id: '/aeropuertos',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/register': typeof RegisterRoute
   '/aeropuertos': typeof AuthenticatedAeropuertosRoute
+  '/colapso': typeof AuthenticatedColapsoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/en-vivo': typeof AuthenticatedEnVivoRoute
   '/simulacion': typeof AuthenticatedSimulacionRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/register': typeof RegisterRoute
   '/aeropuertos': typeof AuthenticatedAeropuertosRoute
+  '/colapso': typeof AuthenticatedColapsoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/en-vivo': typeof AuthenticatedEnVivoRoute
   '/simulacion': typeof AuthenticatedSimulacionRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/register': typeof RegisterRoute
   '/_authenticated/aeropuertos': typeof AuthenticatedAeropuertosRoute
+  '/_authenticated/colapso': typeof AuthenticatedColapsoRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/en-vivo': typeof AuthenticatedEnVivoRoute
   '/_authenticated/simulacion': typeof AuthenticatedSimulacionRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/register'
     | '/aeropuertos'
+    | '/colapso'
     | '/dashboard'
     | '/en-vivo'
     | '/simulacion'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
     | '/'
     | '/register'
     | '/aeropuertos'
+    | '/colapso'
     | '/dashboard'
     | '/en-vivo'
     | '/simulacion'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/register'
     | '/_authenticated/aeropuertos'
+    | '/_authenticated/colapso'
     | '/_authenticated/dashboard'
     | '/_authenticated/en-vivo'
     | '/_authenticated/simulacion'
@@ -157,6 +169,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/colapso': {
+      id: '/_authenticated/colapso'
+      path: '/colapso'
+      fullPath: '/colapso'
+      preLoaderRoute: typeof AuthenticatedColapsoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/aeropuertos': {
       id: '/_authenticated/aeropuertos'
       path: '/aeropuertos'
@@ -169,6 +188,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAeropuertosRoute: typeof AuthenticatedAeropuertosRoute
+  AuthenticatedColapsoRoute: typeof AuthenticatedColapsoRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEnVivoRoute: typeof AuthenticatedEnVivoRoute
   AuthenticatedSimulacionRoute: typeof AuthenticatedSimulacionRoute
@@ -176,6 +196,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAeropuertosRoute: AuthenticatedAeropuertosRoute,
+  AuthenticatedColapsoRoute: AuthenticatedColapsoRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEnVivoRoute: AuthenticatedEnVivoRoute,
   AuthenticatedSimulacionRoute: AuthenticatedSimulacionRoute,

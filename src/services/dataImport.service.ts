@@ -2,6 +2,12 @@
  * Servicio para importar datos desde archivos .txt
  * Sigue el patrón de MoraPack-Backend: cada archivo se sube y guarda en BD inmediatamente
  */
+import axios from 'axios';
+import type { FileUploadValidationResponse } from '@/types/fileUpload.types';
+
+interface FileUploadValidationResponseWithErrors extends FileUploadValidationResponse {
+  errors?: string[];
+}
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -363,3 +369,55 @@ export async function limpiarDataPrueba(): Promise<ImportResult> {
     throw error;
   }
 }
+
+/**
+ * ========================================
+ * FUNCIONES ESPECÍFICAS PARA COLAPSO
+ * ========================================
+ */
+
+/**
+ * Valida archivos de pedidos y cancelaciones de forma volátil (RAM).
+ * No persiste los datos en la base de datos relacional.
+ */
+export const validarEstructuraVolatil = async (
+  pedidos: File[],
+  cancelaciones?: File
+): Promise<FileUploadValidationResponseWithErrors> => {
+  const formData = new FormData();
+  
+  // 1. Agregamos los archivos de pedidos al FormData
+  // El backend debe esperar una lista o array llamado 'files'
+  pedidos.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  // 2. Agregamos el archivo de cancelaciones si existe
+  if (cancelaciones) {
+    formData.append('cancelaciones', cancelaciones);
+  }
+
+  try {
+    // 3. Enviamos al endpoint específico de validación volátil
+    const response = await axios.post<FileUploadValidationResponse>(
+      `${API_URL}/api/simulacion/upload/validar-volatil`, 
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.error('Error en validación volátil:', error);
+    // Retornamos un objeto de error compatible con la interfaz
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al conectar con el servidor de validación.',
+      errors: error.response?.data?.errors || [],
+      usingDatabaseFallback: false
+    };
+  }
+};
